@@ -1,35 +1,39 @@
 """Image file handler — processes standalone image files (PNG, JPG, etc.)."""
 
+from __future__ import annotations
+
 from pathlib import Path
 
 from PIL import Image
 
-from unwatermark.core.detector import detect_watermark_region
+from unwatermark.config import Config
+from unwatermark.core.detector import detect_watermark
 from unwatermark.core.remover import remove_watermark
+from unwatermark.models.annotation import UserAnnotation
 
 
 def process_image(
     input_path: Path,
     output_path: Path,
-    position: str = "bottom-right",
-    width_ratio: float = 0.25,
-    height_ratio: float = 0.06,
+    config: Config,
+    annotation: UserAnnotation | None = None,
+    force_strategy: str | None = None,
 ) -> Path:
     """Remove watermark from a single image file.
 
     Args:
         input_path: Path to the source image.
         output_path: Path to write the cleaned image.
-        position: Watermark position hint.
-        width_ratio: Fraction of image width the watermark occupies.
-        height_ratio: Fraction of image height the watermark occupies.
+        config: Runtime configuration.
+        annotation: Optional user hints about the watermark.
+        force_strategy: Override the AI's strategy recommendation.
 
     Returns:
         Path to the output file.
     """
     image = Image.open(input_path)
-    region = detect_watermark_region(image, position, width_ratio, height_ratio)
-    cleaned = remove_watermark(image, region)
+    analysis = detect_watermark(image, config, annotation)
+    cleaned = remove_watermark(image, analysis, config, force_strategy)
 
     # Convert back to RGB if saving as JPEG
     if output_path.suffix.lower() in (".jpg", ".jpeg"):

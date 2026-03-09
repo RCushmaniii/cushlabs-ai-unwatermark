@@ -1,36 +1,59 @@
 """CLI entry point for unwatermark."""
 
+from __future__ import annotations
+
 from pathlib import Path
 
 import click
+
+from unwatermark.config import load_config
 
 
 @click.command()
 @click.argument("input_file", type=click.Path(exists=True, path_type=Path))
 @click.option("-o", "--output", type=click.Path(path_type=Path), default=None, help="Output path.")
 @click.option(
-    "--position",
-    type=click.Choice(
-        ["bottom-right", "bottom-left", "bottom-center", "top-right", "top-left", "top-center"]
-    ),
-    default="bottom-right",
-    help="Watermark position hint.",
+    "--annotate",
+    type=str,
+    default=None,
+    help="Text description of the watermark to help AI detection.",
 )
-@click.option("--width-ratio", type=float, default=0.25, help="Watermark width as fraction of image.")
-@click.option("--height-ratio", type=float, default=0.06, help="Watermark height as fraction of image.")
+@click.option(
+    "--strategy",
+    type=click.Choice(["solid_fill", "gradient_fill", "clone_stamp", "inpaint"]),
+    default=None,
+    help="Force a specific removal strategy (skip AI recommendation).",
+)
+@click.option("--no-ai", is_flag=True, help="Disable AI analysis, use position-based heuristic.")
+@click.option(
+    "--model",
+    type=click.Choice(["claude", "openai"]),
+    default=None,
+    help="Which vision model to use for analysis.",
+)
 def main(
     input_file: Path,
     output: Path | None,
-    position: str,
-    width_ratio: float,
-    height_ratio: float,
+    annotate: str | None,
+    strategy: str | None,
+    no_ai: bool,
+    model: str | None,
 ) -> None:
     """Remove watermarks from images, PDFs, and PPTX files.
 
-    Drop a file in, get a clean version out.
+    Drop a file in, get a clean version out. Uses AI vision to detect
+    watermarks and choose the best removal technique automatically.
     """
-    suffix = input_file.suffix.lower()
+    overrides = {}
+    if no_ai:
+        overrides["use_ai"] = False
+    if model:
+        from unwatermark.config import AnalysisProvider
+        overrides["analysis_provider"] = AnalysisProvider(model)
 
+    config = load_config(**overrides)
+
+    suffix = input_file.suffix.lower()
     if output is None:
         output = input_file.with_stem(input_file.stem + "_clean")
 
@@ -40,8 +63,17 @@ def main(
             f"Unsupported file type: {suffix}. Supported: .png, .jpg, .jpeg, .bmp, .tiff, .pdf, .pptx"
         )
 
-    click.echo(f"Processing {input_file.name}...")
-    result = handler(input_file, output, position, width_ratio, height_ratio)
+    annotation = None
+    if annotate:
+        from unwatermark.models.annotation import UserAnnotation
+        annotation = UserAnnotation(description=annotate)
+
+    if config.can_use_ai:
+        click.echo(f"Analyzing {input_file.name} with {config.analysis_provider.value}...")
+    else:
+        click.echo(f"Processing {input_file.name} (heuristic mode)...")
+
+    result = handler(input_file, output, config, annotation, strategy)
     click.echo(f"Done! Saved to {result}")
 
 

@@ -1,4 +1,5 @@
+from unwatermark.core.analyzer import analyze_watermark
 from unwatermark.core.remover import remove_watermark
-from unwatermark.core.detector import detect_watermark_region
+from unwatermark.core.strategies import select_strategy
 
-__all__ = ["remove_watermark", "detect_watermark_region"]
+__all__ = ["analyze_watermark", "remove_watermark", "select_strategy"]

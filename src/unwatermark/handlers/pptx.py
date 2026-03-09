@@ -4,43 +4,45 @@ Targets the common case: slides that are each a single full-size PNG image
 (e.g., exported from NotebookLM) with a watermark baked into the image.
 """
 
+from __future__ import annotations
+
 import io
 from pathlib import Path
 
 from PIL import Image
 from pptx import Presentation
-from pptx.util import Emu
 
-from unwatermark.core.detector import detect_watermark_region
+from unwatermark.config import Config
+from unwatermark.core.detector import detect_watermark
 from unwatermark.core.remover import remove_watermark
+from unwatermark.models.annotation import UserAnnotation
 
 
 def process_pptx(
     input_path: Path,
     output_path: Path,
-    position: str = "bottom-right",
-    width_ratio: float = 0.25,
-    height_ratio: float = 0.06,
+    config: Config,
+    annotation: UserAnnotation | None = None,
+    force_strategy: str | None = None,
 ) -> Path:
     """Remove watermarks from all images embedded in a PPTX file.
 
-    Iterates through every slide, finds image shapes, processes each image
-    to remove the watermark, and replaces the image blob in-place.
+    Each slide image is analyzed independently — different slides may get
+    different removal strategies based on their background content.
 
     Args:
         input_path: Path to the source PPTX.
         output_path: Path to write the cleaned PPTX.
-        position: Watermark position hint.
-        width_ratio: Fraction of image width the watermark occupies.
-        height_ratio: Fraction of image height the watermark occupies.
+        config: Runtime configuration.
+        annotation: Optional user hints about the watermark.
+        force_strategy: Override the AI's strategy recommendation.
 
     Returns:
         Path to the output file.
     """
     prs = Presentation(str(input_path))
-    images_processed = 0
 
-    for slide_idx, slide in enumerate(prs.slides):
+    for slide in prs.slides:
         for shape in slide.shapes:
             if not shape.shape_type or not hasattr(shape, "image"):
                 continue
@@ -50,31 +52,28 @@ def process_pptx(
             except Exception:
                 continue
 
-            # Read the embedded image
             image_bytes = image_part.blob
             image = Image.open(io.BytesIO(image_bytes))
 
-            # Detect and remove watermark
-            region = detect_watermark_region(image, position, width_ratio, height_ratio)
-            cleaned = remove_watermark(image, region)
+            analysis = detect_watermark(image, config, annotation)
+            if not analysis.watermark_found:
+                continue
 
-            # Convert back to the original format
+            cleaned = remove_watermark(image, analysis, config, force_strategy)
+
             buf = io.BytesIO()
             img_format = _content_type_to_format(image_part.content_type)
             if img_format == "JPEG":
                 cleaned = cleaned.convert("RGB")
             cleaned.save(buf, format=img_format, quality=95)
 
-            # Replace the image blob in the PPTX
             image_part._blob = buf.getvalue()
-            images_processed += 1
 
     prs.save(str(output_path))
     return output_path
 
 
 def _content_type_to_format(content_type: str) -> str:
-    """Map MIME content type to PIL format string."""
     mapping = {
         "image/png": "PNG",
         "image/jpeg": "JPEG",

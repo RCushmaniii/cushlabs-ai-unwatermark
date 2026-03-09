@@ -1,34 +1,37 @@
 """PDF file handler — extracts pages as images, removes watermarks, reassembles."""
 
+from __future__ import annotations
+
 import io
 from pathlib import Path
 
 import fitz  # PyMuPDF
 from PIL import Image
 
-from unwatermark.core.detector import detect_watermark_region
+from unwatermark.config import Config
+from unwatermark.core.detector import detect_watermark
 from unwatermark.core.remover import remove_watermark
+from unwatermark.models.annotation import UserAnnotation
 
 
 def process_pdf(
     input_path: Path,
     output_path: Path,
-    position: str = "bottom-right",
-    width_ratio: float = 0.25,
-    height_ratio: float = 0.06,
+    config: Config,
+    annotation: UserAnnotation | None = None,
+    force_strategy: str | None = None,
     dpi: int = 200,
 ) -> Path:
     """Remove watermarks from a PDF by rendering pages, cleaning, and reassembling.
 
-    Each page is rendered to a high-res image, the watermark is removed,
-    and a new PDF is built from the cleaned images.
+    Each page is analyzed independently for optimal per-page strategy selection.
 
     Args:
         input_path: Path to the source PDF.
         output_path: Path to write the cleaned PDF.
-        position: Watermark position hint.
-        width_ratio: Fraction of image width the watermark occupies.
-        height_ratio: Fraction of image height the watermark occupies.
+        config: Runtime configuration.
+        annotation: Optional user hints about the watermark.
+        force_strategy: Override the AI's strategy recommendation.
         dpi: Resolution for rendering PDF pages to images.
 
     Returns:
@@ -44,21 +47,17 @@ def process_pdf(
         page = src_doc[page_idx]
         pix = page.get_pixmap(matrix=matrix)
 
-        # Convert PyMuPDF pixmap to PIL Image
         image = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
 
-        # Detect and remove watermark
-        region = detect_watermark_region(image, position, width_ratio, height_ratio)
-        cleaned = remove_watermark(image, region)
+        analysis = detect_watermark(image, config, annotation)
+        cleaned = remove_watermark(image, analysis, config, force_strategy)
         cleaned = cleaned.convert("RGB")
 
-        # Convert cleaned image back to a PDF page
         buf = io.BytesIO()
         cleaned.save(buf, format="JPEG", quality=95)
         buf.seek(0)
 
         img_doc = fitz.open(stream=buf.read(), filetype="jpeg")
-        # Insert image as a page matching original page dimensions
         rect = page.rect
         out_page = out_doc.new_page(width=rect.width, height=rect.height)
         out_page.insert_image(rect, stream=img_doc.tobytes())

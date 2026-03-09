@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "unwatermark"
-version = "0.1.0"
+version = "0.2.0"
 description = "AI-powered watermark removal tool for images, PDFs, and PPTX files"
 requires-python = ">=3.10"
 dependencies = [
@@ -13,6 +13,8 @@ dependencies = [
     "PyMuPDF>=1.23",
     "click>=8.1",
     "numpy>=1.24",
+    "anthropic>=0.40",
+    "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]
@@ -20,6 +22,18 @@ web = [
     "fastapi>=0.104",
     "uvicorn>=0.24",
     "python-multipart>=0.0.6",
+]
+openai = [
+    "openai>=1.50",
+]
+inpaint = [
+    "simple-lama-inpainting>=0.5",
+]
+replicate = [
+    "replicate>=0.25",
+]
+all = [
+    "unwatermark[web,openai,inpaint,replicate]",
 ]
 dev = [
     "pytest>=7.0",
