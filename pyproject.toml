@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "unwatermark"
+version = "0.1.0"
+description = "AI-powered watermark removal tool for images, PDFs, and PPTX files"
+requires-python = ">=3.10"
+dependencies = [
+    "Pillow>=10.0",
+    "python-pptx>=0.6.23",
+    "PyMuPDF>=1.23",
+    "click>=8.1",
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+web = [
+    "fastapi>=0.104",
+    "uvicorn>=0.24",
+    "python-multipart>=0.0.6",
+]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.1",
+]
+
+[project.scripts]
+unwatermark = "unwatermark.cli:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
