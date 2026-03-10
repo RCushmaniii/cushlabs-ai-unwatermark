@@ -23,11 +23,11 @@ tags:
   - "fastapi"
   - "automation"
 
-thumbnail: "public/images/unwatermark-thumbnail.jpg"
+thumbnail: "/public/images/unwatermark-thumbnail.jpg"
 hero_images:
-  - "public/images/unwatermark-before-after.jpg"
-  - "public/images/unwatermark-web-ui.jpg"
-  - "public/images/unwatermark-cli.jpg"
+  - "/public/images/unwatermark-before-after.jpg"
+  - "/public/images/unwatermark-web-ui.jpg"
+  - "/public/images/unwatermark-cli.jpg"
 demo_video_url: ""
 
 live_url: ""
