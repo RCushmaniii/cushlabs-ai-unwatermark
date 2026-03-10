@@ -6,7 +6,7 @@ APP_PAGE = page("App", """
 <div class="steps-bar">
   <div class="step-indicator active" id="ind1"><span class="step-num">1</span>Upload</div>
   <div class="step-indicator" id="ind2"><span class="step-num">2</span><span id="step2Label">Annotate</span></div>
-  <div class="step-indicator" id="ind3"><span class="step-num">3</span>Compare</div>
+  <div class="step-indicator" id="ind3"><span class="step-num">3</span>Result</div>
 </div>
 
 <!-- Step 1: Upload -->
@@ -60,16 +60,6 @@ APP_PAGE = page("App", """
       </button>
       <div id="analysisResultImage"></div>
       <div id="removeRowImage" style="display:none;">
-        <div class="control-group" style="margin-bottom:0.75rem;">
-          <label class="control-label">Removal strategy</label>
-          <select class="control-input" id="strategySelectImage">
-            <option value="">AI Recommended</option>
-            <option value="solid_fill">Solid Fill</option>
-            <option value="gradient_fill">Gradient Fill</option>
-            <option value="clone_stamp">Clone Stamp</option>
-            <option value="inpaint">Inpaint (LaMa)</option>
-          </select>
-        </div>
         <button class="btn btn-primary btn-full" id="btnRemoveImage">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>
           Remove Watermark
@@ -112,16 +102,6 @@ APP_PAGE = page("App", """
       </div>
       <div id="analysisResultDoc"></div>
       <div id="removeRowDoc" style="display:none;">
-        <div class="control-group" style="margin-bottom:0.75rem;">
-          <label class="control-label">Removal strategy</label>
-          <select class="control-input" id="strategySelectDoc">
-            <option value="">AI Recommended</option>
-            <option value="solid_fill">Solid Fill</option>
-            <option value="gradient_fill">Gradient Fill</option>
-            <option value="clone_stamp">Clone Stamp</option>
-            <option value="inpaint">Inpaint (LaMa)</option>
-          </select>
-        </div>
         <button class="btn btn-primary btn-full" id="btnRemoveDoc">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>
           Remove Watermark
@@ -132,32 +112,54 @@ APP_PAGE = page("App", """
   </div>
 </div>
 
-<!-- Step 3: Compare -->
+<!-- Step 3: Result -->
 <div class="step" id="stepCompare">
-  <div class="compare-container" id="compareContainer">
-    <img id="imgBefore" src="" alt="Before">
-    <div class="compare-after" id="compareAfter">
-      <img id="imgAfter" src="" alt="After">
+  <!-- Image result: before/after slider -->
+  <div id="imageResult" style="display:none;">
+    <div class="compare-container" id="compareContainer">
+      <img id="imgBefore" src="" alt="Before">
+      <div class="compare-after" id="compareAfter">
+        <img id="imgAfter" src="" alt="After">
+      </div>
+      <div class="compare-handle" id="compareHandle">
+        <div class="compare-handle-line"></div>
+        <div class="compare-handle-grip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M8 5l-5 7 5 7M16 5l5 7-5 7"/></svg>
+        </div>
+      </div>
+      <span class="compare-tag before-tag">Before</span>
+      <span class="compare-tag after-tag">After</span>
     </div>
-    <div class="compare-handle" id="compareHandle">
-      <div class="compare-handle-line"></div>
-      <div class="compare-handle-grip">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M8 5l-5 7 5 7M16 5l5 7-5 7"/></svg>
+    <div class="btn-row" style="justify-content:center;margin-top:1.25rem;">
+      <button class="btn btn-secondary" id="btnRetry">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        Try Again
+      </button>
+      <button class="btn btn-secondary" id="btnRestart">Start Over</button>
+      <button class="btn btn-primary" id="btnDownload">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download Clean File
+      </button>
+    </div>
+  </div>
+
+  <!-- Document result: success card + download -->
+  <div id="docResult" style="display:none;">
+    <div class="result-card">
+      <div class="result-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      </div>
+      <h2 class="result-title">Watermarks Removed</h2>
+      <p class="result-subtitle" id="resultSubtitle">Your clean file is ready to download.</p>
+      <div class="result-filename" id="resultFilename"></div>
+      <div class="btn-row" style="justify-content:center;margin-top:1.5rem;">
+        <button class="btn btn-secondary" id="btnRestartDoc">Start Over</button>
+        <button class="btn btn-primary btn-lg" id="btnDownloadDoc">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download Clean File
+        </button>
       </div>
     </div>
-    <span class="compare-tag before-tag">Before</span>
-    <span class="compare-tag after-tag">After</span>
-  </div>
-  <div class="btn-row" style="justify-content:center;margin-top:1.25rem;">
-    <button class="btn btn-secondary" id="btnRetry">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-      Try Different Strategy
-    </button>
-    <button class="btn btn-secondary" id="btnRestart">Start Over</button>
-    <button class="btn btn-primary" id="btnDownload">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Download Clean File
-    </button>
   </div>
 </div>
 
@@ -177,9 +179,9 @@ APP_PAGE = page("App", """
 }
 .drop-icon { margin-bottom: 0.75rem; }
 .drop-zone.dragover .drop-icon svg { stroke: var(--accent); }
-.drop-title { color: var(--text-heading); font-size: 0.95rem; font-weight: 500; margin-bottom: 0.25rem; }
-.drop-formats { color: var(--text-muted); font-size: 0.78rem; }
-.drop-size { color: var(--text-faint); font-size: 0.72rem; margin-top: 0.15rem; }
+.drop-title { color: var(--text-heading); font-size: 1.05rem; font-weight: 500; margin-bottom: 0.25rem; }
+.drop-formats { color: var(--text-muted); font-size: 0.88rem; }
+.drop-size { color: var(--text-faint); font-size: 0.82rem; margin-top: 0.15rem; }
 input[type="file"] { display: none; }
 
 /* Annotate layout — image files */
@@ -197,7 +199,7 @@ input[type="file"] { display: none; }
   border-radius: var(--radius); overflow: hidden; position: relative;
 }
 .canvas-wrapper canvas { display: block; width: 100%; cursor: crosshair; }
-.canvas-hint { font-size: 0.72rem; color: var(--text-faint); margin-top: 0.4rem; }
+.canvas-hint { font-size: 0.82rem; color: var(--text-faint); margin-top: 0.4rem; }
 
 /* Describe layout — document files */
 .describe-layout {
@@ -209,23 +211,23 @@ input[type="file"] { display: none; }
   margin-bottom: 1.25rem;
 }
 .doc-icon { margin-bottom: 0.5rem; }
-.doc-name { font-weight: 600; color: var(--text-heading); font-size: 0.92rem; margin-bottom: 0.15rem; }
-.doc-size { color: var(--text-muted); font-size: 0.78rem; }
+.doc-name { font-weight: 600; color: var(--text-heading); font-size: 1rem; margin-bottom: 0.15rem; }
+.doc-size { color: var(--text-muted); font-size: 0.88rem; }
 .describe-form {}
 .describe-actions { display: flex; gap: 0.75rem; margin-top: 1rem; }
 .describe-actions .btn-primary { flex: 1; }
-.input-help { font-size: 0.72rem; color: var(--text-faint); margin-top: 0.35rem; }
+.input-help { font-size: 0.82rem; color: var(--text-faint); margin-top: 0.35rem; }
 
 /* Controls */
 .control-group { margin-bottom: 0.85rem; }
 .control-label {
-  font-size: 0.78rem; font-weight: 600; color: var(--text-body);
+  font-size: 0.88rem; font-weight: 600; color: var(--text-body);
   display: block; margin-bottom: 0.3rem;
 }
 .control-input {
   width: 100%; background: var(--bg-secondary);
   border: 1px solid var(--border); color: var(--text-heading);
-  padding: 0.5rem 0.7rem; border-radius: var(--radius); font-size: 0.85rem;
+  padding: 0.55rem 0.75rem; border-radius: var(--radius); font-size: 0.92rem;
   font-family: inherit; transition: border-color 0.15s;
 }
 .control-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,71,171,0.12); }
@@ -238,25 +240,44 @@ input[type="file"] { display: none; }
   border-radius: var(--radius); padding: 1rem; margin-top: 0.85rem;
 }
 .analysis-card h3 {
-  font-size: 0.82rem; font-weight: 600; color: var(--text-heading);
+  font-size: 0.95rem; font-weight: 600; color: var(--text-heading);
   margin-bottom: 0.6rem;
 }
 .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 .analysis-item {}
 .analysis-label {
-  font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase;
+  font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;
   letter-spacing: 0.04em; font-weight: 600;
 }
-.analysis-value { font-size: 0.82rem; color: var(--text-heading); margin-top: 0.1rem; }
+.analysis-value { font-size: 0.92rem; color: var(--text-heading); margin-top: 0.1rem; }
 .confidence-bar { height: 3px; border-radius: 2px; background: var(--border-light); margin-top: 0.25rem; }
 .confidence-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
 .confidence-high { background: var(--success); }
 .confidence-mid { background: #d97706; }
 .confidence-low { background: var(--error); }
 .reasoning {
-  font-size: 0.78rem; color: var(--text-muted); margin-top: 0.5rem;
+  font-size: 0.88rem; color: var(--text-muted); margin-top: 0.5rem;
   line-height: 1.5; grid-column: 1 / -1;
 }
+
+/* Result card (documents) */
+.result-card {
+  max-width: 480px; margin: 2rem auto; text-align: center;
+  background: var(--bg-primary); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 2.5rem 2rem;
+}
+.result-icon { margin-bottom: 1rem; }
+.result-title {
+  font-family: 'Josefin Sans', sans-serif; font-size: 1.5rem;
+  font-weight: 700; color: var(--text-heading); margin-bottom: 0.5rem;
+}
+.result-subtitle { color: var(--text-muted); font-size: 1rem; margin-bottom: 1rem; }
+.result-filename {
+  display: inline-block; background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 0.5rem 1rem;
+  font-size: 0.92rem; color: var(--text-body); font-weight: 500;
+}
+.btn-lg { padding: 0.7rem 1.5rem; font-size: 1rem; }
 
 /* Error alert */
 .error-alert {
@@ -265,7 +286,7 @@ input[type="file"] { display: none; }
   align-items: flex-start;
 }
 .error-alert svg { flex-shrink: 0; margin-top: 1px; }
-.error-alert p { font-size: 0.82rem; color: #991b1b; line-height: 1.4; }
+.error-alert p { font-size: 0.92rem; color: #991b1b; line-height: 1.4; }
 
 /* Compare */
 .compare-container {
@@ -302,7 +323,7 @@ input[type="file"] { display: none; }
   border-radius: var(--radius); padding: 1.25rem; margin-top: 0.85rem;
 }
 .progress-label {
-  font-size: 0.78rem; color: var(--text-body); margin-bottom: 0.5rem;
+  font-size: 0.92rem; color: var(--text-body); margin-bottom: 0.5rem;
   font-weight: 600;
 }
 .progress-track {
@@ -313,7 +334,7 @@ input[type="file"] { display: none; }
   transition: width 0.3s ease; width: 0%;
 }
 .progress-status {
-  font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem;
+  font-size: 0.88rem; color: var(--text-muted); margin-top: 0.4rem;
 }
 </style>
 
@@ -350,7 +371,6 @@ function getLocInput() { return isImageFile ? document.getElementById('locInputI
 function getStatus() { return isImageFile ? document.getElementById('statusImage') : document.getElementById('statusDoc'); }
 function getAnalysisResult() { return isImageFile ? document.getElementById('analysisResultImage') : document.getElementById('analysisResultDoc'); }
 function getRemoveRow() { return isImageFile ? document.getElementById('removeRowImage') : document.getElementById('removeRowDoc'); }
-function getStrategySelect() { return isImageFile ? document.getElementById('strategySelectImage') : document.getElementById('strategySelectDoc'); }
 
 function showStep(name) {
   Object.values(steps).forEach(s => s.classList.remove('active'));
@@ -547,6 +567,17 @@ async function doAnalyze() {
   getStatus().className = 'status'; getStatus().textContent = '';
   getAnalysisResult().innerHTML = '';
 
+  // Show analyzing feedback for documents
+  if (!isImageFile) {
+    getAnalysisResult().innerHTML =
+      '<div class="progress-panel">' +
+      '<div class="progress-label">Analyzing document</div>' +
+      '<div class="progress-track"><div class="progress-fill" style="width:40%;animation:pulse 1.5s ease-in-out infinite"></div></div>' +
+      '<div class="progress-status">Extracting first page and sending to AI for analysis\u2026</div>' +
+      '</div>' +
+      '<style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}</style>';
+  }
+
   const fd = new FormData();
   fd.append('file', uploadedFile);
   fd.append('description', getDescInput().value);
@@ -564,7 +595,6 @@ async function doAnalyze() {
       analysisData = data;
       renderAnalysis(analysisData);
       getRemoveRow().style.display = 'block';
-      getStrategySelect().value = '';
     }
   } catch (err) {
     showError('Could not reach the server. Check your connection and try again.');
@@ -644,7 +674,6 @@ async function doRemove() {
   fd.append('file', uploadedFile);
   fd.append('description', getDescInput().value);
   fd.append('location', getLocInput().value);
-  fd.append('strategy', getStrategySelect().value);
   if (drawnRect) {
     fd.append('region_x', drawnRect.x); fd.append('region_y', drawnRect.y);
     fd.append('region_w', drawnRect.w); fd.append('region_h', drawnRect.h);
@@ -697,9 +726,19 @@ async function doRemove() {
   setLoading(btn, false);
 }
 
-// Compare
+// Result
 function showCompare() {
-  if (!isImageFile) { triggerDownload(); return; }
+  if (!isImageFile) {
+    // Document: show success card
+    document.getElementById('imageResult').style.display = 'none';
+    document.getElementById('docResult').style.display = 'block';
+    document.getElementById('resultFilename').textContent = 'clean_' + uploadedFile.name;
+    showStep('compare');
+    return;
+  }
+  // Image: show before/after slider
+  document.getElementById('imageResult').style.display = 'block';
+  document.getElementById('docResult').style.display = 'none';
   const beforeUrl = URL.createObjectURL(uploadedFile);
   const afterUrl = URL.createObjectURL(cleanBlob);
   const beforeImg = document.getElementById('imgBefore');
@@ -749,9 +788,10 @@ function triggerDownload() {
   URL.revokeObjectURL(url);
 }
 
+document.getElementById('btnDownloadDoc').addEventListener('click', triggerDownload);
 document.getElementById('btnRetry').addEventListener('click', () => { showStep('annotate'); });
 
-document.getElementById('btnRestart').addEventListener('click', () => {
+function doRestart() {
   uploadedFile = null; drawnRect = null; analysisData = null; cleanBlob = null;
   isImageFile = false;
   fileInput.value = '';
@@ -767,6 +807,8 @@ document.getElementById('btnRestart').addEventListener('click', () => {
   document.getElementById('statusDoc').textContent = '';
   updateClearButton();
   showStep('upload');
-});
+}
+document.getElementById('btnRestart').addEventListener('click', doRestart);
+document.getElementById('btnRestartDoc').addEventListener('click', doRestart);
 </script>
 """, active_nav="app")
