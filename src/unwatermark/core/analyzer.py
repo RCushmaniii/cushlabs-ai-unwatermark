@@ -27,7 +27,25 @@ from unwatermark.models.annotation import UserAnnotation
 logger = logging.getLogger(__name__)
 
 _ANALYSIS_PROMPT_TEMPLATE = (
-    "You are a watermark detection expert. Analyze this image and identify any watermarks.\n"
+    "You are a watermark detection expert. Your job is to find ANY watermark, "
+    "logo, or overlay text in this image. Watermarks are VERY common — most "
+    "images have them. Look carefully in ALL corners and edges, not just the center.\n"
+    "\n"
+    "Common watermark types:\n"
+    "- Semi-transparent text overlays (e.g., stock photo sites, NotebookLM, Canva)\n"
+    "- Small logos in corners (e.g., Getty, Shutterstock, YouTube)\n"
+    "- 'Made with...' or 'Created by...' text, often in bottom corners\n"
+    "- Diagonal repeating text across the image\n"
+    "- Audio waveform labels like 'NotebookLM' on podcast/audio visuals\n"
+    "\n"
+    "COORDINATE SYSTEM:\n"
+    "- Origin (0, 0) is the TOP-LEFT corner of the image\n"
+    "- x increases going RIGHT, y increases going DOWN\n"
+    "- The image is WIDTHxHEIGHT pixels\n"
+    "- Your bounding box MUST use absolute pixel coordinates\n"
+    "- The bounding box must FULLY contain the watermark with some margin\n"
+    "- Example: a watermark in the bottom-right of a 1920x1080 image might be "
+    'at {"x": 1400, "y": 1020, "width": 500, "height": 50}\n'
     "\n"
     "Return a JSON object with these exact fields:\n"
     "{\n"
@@ -50,15 +68,20 @@ _ANALYSIS_PROMPT_TEMPLATE = (
     '  "clone_direction": "above" | "below" | "left" | "right"\n'
     "}\n"
     "\n"
+    "IMPORTANT: Set watermark_found to true if there is ANY watermark or overlay. "
+    "Err on the side of detecting watermarks — false negatives are worse than "
+    "false positives for this use case.\n"
+    "\n"
     "Rules for strategy selection:\n"
-    '- "solid_fill": Watermark on a solid color background.\n'
-    '- "gradient_fill": Watermark on a smooth gradient.\n'
-    '- "clone_stamp": Similar content adjacent that can be mirrored.\n'
-    '- "inpaint": Complex backgrounds with text, photos, or diagrams.\n'
+    '- "solid_fill": Watermark on a uniform solid color background.\n'
+    '- "gradient_fill": Watermark on a smooth color gradient.\n'
+    '- "clone_stamp": Watermark on a background with similar content adjacent '
+    "that can be mirrored over it (e.g., slide backgrounds, textures).\n"
+    '- "inpaint": Watermark on complex backgrounds with text, photos, diagrams, '
+    "or mixed content that can't be simply filled or cloned.\n"
     "\n"
-    '"clone_direction": pick the direction with the most similar content.\n'
-    "\n"
-    "The image dimensions are WIDTHxHEIGHT pixels. Return pixel coordinates.\n"
+    '"clone_direction": pick the direction with the most similar, '
+    "clean content that can replace the watermark area.\n"
     "\n"
     "Return ONLY the JSON object, no markdown formatting or extra text."
 )
@@ -154,9 +177,14 @@ def _parse_analysis_json(raw: str, image: Image.Image) -> WatermarkAnalysis:
 
     ctx = data.get("context", {})
 
+    # Use percentage-based padding (3% of image dimensions) instead of fixed 10px
+    pad_x = max(10, int(image.width * 0.03))
+    pad_y = max(10, int(image.height * 0.03))
+    padded_region = region.padded_xy(pad_x, pad_y, image.width, image.height)
+
     return WatermarkAnalysis(
         watermark_found=True,
-        region=region.padded(10, image.width, image.height),
+        region=padded_region,
         description=data.get("description", ""),
         background_type=bg_type,
         background_color=data.get("background_color"),
@@ -211,8 +239,14 @@ def _analyze_with_claude(
     )
 
     raw_text = message.content[0].text
-    logger.debug(f"Claude response: {raw_text}")
-    return _parse_analysis_json(raw_text, image)
+    logger.info(f"Claude raw response: {raw_text}")
+    result = _parse_analysis_json(raw_text, image)
+    logger.info(
+        f"Detection result: found={result.watermark_found}, "
+        f"region=({result.region.x},{result.region.y},{result.region.width}x{result.region.height}), "
+        f"strategy={result.strategy.value}, confidence={result.confidence}"
+    )
+    return result
 
 
 # ---------------------------------------------------------------------------

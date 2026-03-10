@@ -56,10 +56,16 @@ class WatermarkRegion:
 
     def padded(self, padding: int, img_width: int, img_height: int) -> WatermarkRegion:
         """Return a new region expanded by padding, clamped to image bounds."""
-        x = max(0, self.x - padding)
-        y = max(0, self.y - padding)
-        x2 = min(img_width, self.x2 + padding)
-        y2 = min(img_height, self.y2 + padding)
+        return self.padded_xy(padding, padding, img_width, img_height)
+
+    def padded_xy(
+        self, pad_x: int, pad_y: int, img_width: int, img_height: int
+    ) -> WatermarkRegion:
+        """Return a new region expanded by separate x/y padding, clamped to image bounds."""
+        x = max(0, self.x - pad_x)
+        y = max(0, self.y - pad_y)
+        x2 = min(img_width, self.x2 + pad_x)
+        y2 = min(img_height, self.y2 + pad_y)
         return WatermarkRegion(x=x, y=y, width=x2 - x, height=y2 - y)
 
 

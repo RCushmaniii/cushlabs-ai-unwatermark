@@ -105,8 +105,9 @@ class CloneStampTechnique(RemovalTechnique):
         return Image.fromarray((mask * 255).astype(np.uint8), mode="L")
 
     def _fallback_blur(self, image: Image.Image, region: WatermarkRegion) -> Image.Image:
-        """Last resort — gaussian blur the watermark region."""
+        """Last resort — gaussian blur the watermark region with soft-edge blending."""
         crop = image.crop((region.x, region.y, region.x2, region.y2))
         blurred = crop.filter(ImageFilter.GaussianBlur(radius=15))
-        image.paste(blurred, (region.x, region.y))
+        mask = self._build_gradient_mask(region.width, region.height, margin=20)
+        image.paste(blurred, (region.x, region.y), mask)
         return image

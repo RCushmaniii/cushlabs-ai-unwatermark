@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from PIL import Image
 
 from unwatermark.config import Config
@@ -9,6 +11,8 @@ from unwatermark.core.strategies import select_strategy
 from unwatermark.core.techniques import get_technique
 from unwatermark.core.techniques.lama_inpaint import is_lama_available
 from unwatermark.models.analysis import WatermarkAnalysis
+
+logger = logging.getLogger(__name__)
 
 
 def remove_watermark(
@@ -29,6 +33,10 @@ def remove_watermark(
         New PIL Image with the watermark removed.
     """
     if not analysis.watermark_found:
+        logger.warning(
+            "Watermark not detected — returning original image unchanged. "
+            "Try adding a description of the watermark to improve detection."
+        )
         return image.copy()
 
     strategy = select_strategy(
@@ -38,4 +46,9 @@ def remove_watermark(
     )
 
     technique = get_technique(strategy, config)
+    r = analysis.region
+    logger.info(
+        f"Removing watermark: strategy={strategy.value}, technique={technique.name}, "
+        f"region=({r.x},{r.y},{r.width}x{r.height}), image={image.width}x{image.height}"
+    )
     return technique.remove(image, analysis.region, analysis)

@@ -82,27 +82,43 @@ class SolidFillTechnique(RemovalTechnique):
     def _gradient_fill(self, image: Image.Image, region: WatermarkRegion) -> Image.Image:
         """Fill with an interpolated gradient sampled from the region borders."""
         arr = np.array(image, dtype=np.float32)
-        pad = 3
+        pad = 5
+        channels = arr.shape[2]
+
+        def _safe_mean(sliced: np.ndarray, fallback: np.ndarray | None = None) -> np.ndarray:
+            """Mean of a slice, with fallback if the slice is empty."""
+            if sliced.size == 0:
+                return fallback if fallback is not None else np.zeros(channels, dtype=np.float32)
+            return sliced.reshape(-1, channels).mean(axis=0)
 
         # Sample colors at four edges
-        top = arr[max(0, region.y - pad) : region.y, region.x : region.x2].mean(axis=(0, 1))
-        bottom = arr[region.y2 : min(image.height, region.y2 + pad), region.x : region.x2].mean(
-            axis=(0, 1)
-        )
-        left = arr[region.y : region.y2, max(0, region.x - pad) : region.x].mean(axis=(0, 1))
-        right = arr[region.y : region.y2, region.x2 : min(image.width, region.x2 + pad)].mean(
-            axis=(0, 1)
-        )
+        top_slice = arr[max(0, region.y - pad) : region.y, region.x : region.x2]
+        bottom_slice = arr[region.y2 : min(image.height, region.y2 + pad), region.x : region.x2]
+        left_slice = arr[region.y : region.y2, max(0, region.x - pad) : region.x]
+        right_slice = arr[region.y : region.y2, region.x2 : min(image.width, region.x2 + pad)]
 
-        # Bilinear interpolation across the region
+        top = _safe_mean(top_slice)
+        bottom = _safe_mean(bottom_slice, top)
+        left = _safe_mean(left_slice, top)
+        right = _safe_mean(right_slice, bottom)
+
+        # Bilinear interpolation: blend four corners properly
         h, w = region.height, region.width
+        if h < 1 or w < 1:
+            return image
+
         ys = np.linspace(0, 1, h)[:, None, None]
         xs = np.linspace(0, 1, w)[None, :, None]
 
-        # Interpolate vertically then horizontally
-        vert = top * (1 - ys) + bottom * ys
-        horiz = left * (1 - xs) + right * xs
-        blended = (vert + horiz) / 2.0
+        # Four-corner bilinear: top-left, top-right, bottom-left, bottom-right
+        tl = (top + left) / 2.0
+        tr = (top + right) / 2.0
+        bl = (bottom + left) / 2.0
+        br = (bottom + right) / 2.0
+
+        top_row = tl * (1 - xs) + tr * xs
+        bottom_row = bl * (1 - xs) + br * xs
+        blended = top_row * (1 - ys) + bottom_row * ys
 
         patch = np.clip(blended, 0, 255).astype(np.uint8)
         fill = Image.fromarray(patch, mode=image.mode)
