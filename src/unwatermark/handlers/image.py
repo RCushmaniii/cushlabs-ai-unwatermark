@@ -8,8 +8,7 @@ from typing import Callable
 from PIL import Image
 
 from unwatermark.config import Config
-from unwatermark.core.detector import detect_watermark
-from unwatermark.core.remover import remove_watermark
+from unwatermark.core.multipass import clean_image
 from unwatermark.models.annotation import UserAnnotation
 
 
@@ -38,22 +37,22 @@ def process_image(
         on_progress("Analyzing image for watermarks\u2026", 10)
 
     image = Image.open(input_path)
-    analysis = detect_watermark(image, config, annotation)
 
     if on_progress:
-        on_progress("Removing watermark\u2026", 50)
+        on_progress("Removing watermarks\u2026", 30)
 
-    cleaned = remove_watermark(image, analysis, config, force_strategy)
+    result = clean_image(image, config, annotation, force_strategy)
 
     if output_path.suffix.lower() in (".jpg", ".jpeg"):
-        cleaned = cleaned.convert("RGB")
+        result.image = result.image.convert("RGB")
 
     if on_progress:
         on_progress("Saving cleaned image\u2026", 90)
 
-    cleaned.save(output_path, quality=95)
+    result.image.save(output_path, quality=95)
 
     if on_progress:
-        on_progress("Done", 100)
+        msg = f"Done — removed {result.removed} watermark{'s' if result.removed != 1 else ''}"
+        on_progress(msg, 100)
 
     return output_path

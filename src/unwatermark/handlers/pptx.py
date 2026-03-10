@@ -15,8 +15,7 @@ from PIL import Image
 from pptx import Presentation
 
 from unwatermark.config import Config
-from unwatermark.core.detector import detect_watermark
-from unwatermark.core.remover import remove_watermark
+from unwatermark.core.multipass import clean_image
 from unwatermark.models.analysis import WatermarkAnalysis
 from unwatermark.models.annotation import UserAnnotation
 
@@ -32,6 +31,10 @@ def process_pptx(
     on_progress: Callable[[str, int], None] | None = None,
 ) -> Path:
     """Remove watermarks from all images embedded in a PPTX file.
+
+    Uses multi-pass cleaning on each slide to catch multiple watermarks.
+    Tracks a baseline detection from the first successful slide to help
+    with slides where detection fails.
 
     Args:
         input_path: Path to the source PPTX.
@@ -55,10 +58,7 @@ def process_pptx(
             f"Split the file or use the CLI for larger presentations."
         )
 
-    # Track the first successful detection so we can reuse it as a fallback.
-    # Watermarked presentations (e.g., NotebookLM) have the same watermark on
-    # every slide, so if the AI misses it on one slide, we can use the bounding
-    # box from a slide where it succeeded.
+    # Baseline from first successful detection — reused when detection fails
     baseline_analysis: WatermarkAnalysis | None = None
 
     for slide_idx, slide in enumerate(prs.slides):
@@ -86,39 +86,32 @@ def process_pptx(
                 f"({content_type})"
             )
 
-            analysis = detect_watermark(image, config, annotation)
-            logger.info(
-                f"Slide {slide_idx + 1}: watermark_found={analysis.watermark_found}, "
-                f"confidence={analysis.confidence}, strategy={analysis.strategy.value}"
+            # Multi-pass: detect and remove all watermarks on this slide
+            result = clean_image(
+                image, config, annotation, force_strategy,
+                baseline=baseline_analysis,
             )
 
-            if analysis.watermark_found:
-                # Save as baseline for slides where detection fails
-                if baseline_analysis is None:
-                    baseline_analysis = analysis
-                    logger.info(
-                        f"Slide {slide_idx + 1}: saved as baseline detection "
-                        f"(region={analysis.region.x},{analysis.region.y},"
-                        f"{analysis.region.width}x{analysis.region.height})"
-                    )
-            else:
-                # AI missed it — reuse baseline if we have one
-                if baseline_analysis is not None:
-                    logger.info(
-                        f"Slide {slide_idx + 1}: AI missed watermark, "
-                        f"reusing baseline detection from earlier slide"
-                    )
-                    analysis = baseline_analysis
-                else:
-                    logger.info(
-                        f"Slide {slide_idx + 1}: no watermark found and no baseline yet"
-                    )
-                    continue
+            if result.removed == 0:
+                logger.info(f"Slide {slide_idx + 1}: no watermarks removed")
+                continue
 
-            cleaned = remove_watermark(image, analysis, config, force_strategy)
+            logger.info(
+                f"Slide {slide_idx + 1}: removed {result.removed} watermark(s)"
+            )
+
+            # Save first successful detection as baseline for future slides
+            if baseline_analysis is None and result.first_analysis is not None:
+                baseline_analysis = result.first_analysis
+                r = baseline_analysis.region
+                logger.info(
+                    f"Slide {slide_idx + 1}: saved baseline "
+                    f"({r.x},{r.y},{r.width}x{r.height})"
+                )
 
             buf = io.BytesIO()
             img_format = _content_type_to_format(content_type)
+            cleaned = result.image
             if img_format == "JPEG":
                 cleaned = cleaned.convert("RGB")
             cleaned.save(buf, format=img_format, quality=95)

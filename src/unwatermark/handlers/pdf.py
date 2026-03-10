@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import logging
 from pathlib import Path
 from typing import Callable
 
@@ -10,9 +11,11 @@ import fitz  # PyMuPDF
 from PIL import Image
 
 from unwatermark.config import Config
-from unwatermark.core.detector import detect_watermark
-from unwatermark.core.remover import remove_watermark
+from unwatermark.core.multipass import clean_image
+from unwatermark.models.analysis import WatermarkAnalysis
 from unwatermark.models.annotation import UserAnnotation
+
+logger = logging.getLogger(__name__)
 
 
 def process_pdf(
@@ -25,6 +28,8 @@ def process_pdf(
     on_progress: Callable[[str, int], None] | None = None,
 ) -> Path:
     """Remove watermarks from a PDF by rendering pages, cleaning, and reassembling.
+
+    Uses multi-pass cleaning on each page to catch multiple watermarks.
 
     Args:
         input_path: Path to the source PDF.
@@ -53,6 +58,7 @@ def process_pdf(
 
     zoom = dpi / 72.0
     matrix = fitz.Matrix(zoom, zoom)
+    baseline_analysis: WatermarkAnalysis | None = None
 
     for page_idx in range(page_count):
         pct = int(5 + (page_idx / page_count) * 90)
@@ -66,9 +72,15 @@ def process_pdf(
 
         image = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
 
-        analysis = detect_watermark(image, config, annotation)
-        cleaned = remove_watermark(image, analysis, config, force_strategy)
-        cleaned = cleaned.convert("RGB")
+        result = clean_image(
+            image, config, annotation, force_strategy,
+            baseline=baseline_analysis,
+        )
+
+        if baseline_analysis is None and result.first_analysis is not None:
+            baseline_analysis = result.first_analysis
+
+        cleaned = result.image.convert("RGB")
 
         buf = io.BytesIO()
         cleaned.save(buf, format="JPEG", quality=95)
