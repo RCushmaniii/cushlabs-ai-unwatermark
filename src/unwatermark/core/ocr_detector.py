@@ -158,11 +158,17 @@ def detect_watermark_ocr(
     # Build the analysis result
     x, y, w, h = watermark.bbox
 
-    # Add minimal padding
-    pad_x = max(5, int(img_w * 0.01))
-    pad_y = max(5, int(img_h * 0.01))
-    region = WatermarkRegion(x=x, y=y, width=w, height=h)
-    padded = region.padded_xy(pad_x, pad_y, img_w, img_h)
+    # Watermark text often has an accompanying icon/logo to the left.
+    # Extend the bounding box leftward by 50% of text width to capture it.
+    # Also add a small vertical expansion and right padding.
+    icon_margin = max(20, int(w * 0.5))
+    pad_right = max(5, int(img_w * 0.01))
+    pad_y = max(8, int(img_h * 0.015))
+
+    expanded_x = max(0, x - icon_margin)
+    expanded_w = w + icon_margin + pad_right
+    region = WatermarkRegion(x=expanded_x, y=y, width=expanded_w, height=h)
+    padded = region.padded_xy(0, pad_y, img_w, img_h)
 
     logger.info(
         f"OCR: detected watermark '{watermark.text}' at ({x},{y},{w}x{h}) "
@@ -237,56 +243,78 @@ def _select_best_watermark(
 ) -> OCRDetection | None:
     """Pick the most likely watermark from OCR detections.
 
+    Scoring is designed so that a known watermark pattern match dominates.
+    Without a pattern match, text needs very strong positional/size signals
+    to be considered — this prevents content text like titles from triggering
+    false positives.
+
     Scoring:
-    - Known watermark text: +3.0 (strongest signal)
-    - Edge/corner position: +1.5
-    - User hint match: already reflected in is_watermark_text
-    - Small relative size (< 15% of image area): +0.5
+    - Known watermark text: +5.0 (dominant signal — almost always correct)
+    - Edge/corner position: +1.0
+    - Small relative size (< 5% of image area): +1.0
+    - Short text (1-3 words): +0.5 (watermarks are brief, content is verbose)
     - OCR confidence: +0.0 to +1.0
     """
     if not detections:
         return None
 
     img_area = img_w * img_h
-    scored: list[tuple[float, OCRDetection]] = []
+    scored: list[tuple[float, bool, OCRDetection]] = []
 
     for det in detections:
         score = 0.0
         _, _, w, h = det.bbox
         det_area = w * h
+        has_pattern = det.is_watermark_text
 
-        # Known watermark text is the strongest signal
-        if det.is_watermark_text:
-            score += 3.0
+        # Known watermark text is the dominant signal
+        if has_pattern:
+            score += 5.0
 
-        # Typical watermark position
+        # Typical watermark position (corners/edges)
         if det.is_edge_position:
-            score += 1.5
+            score += 1.0
 
-        # Watermarks are small relative to the image
-        if det_area < img_area * 0.15:
+        # Watermarks are small — tighter threshold than before
+        if det_area < img_area * 0.05:
+            score += 1.0
+        elif det_area < img_area * 0.15:
+            score += 0.3
+
+        # Watermarks are typically short (1-3 words)
+        word_count = len(det.text.strip().split())
+        if 1 <= word_count <= 3:
             score += 0.5
 
         # OCR confidence
         score += det.confidence
 
-        scored.append((score, det))
+        scored.append((score, has_pattern, det))
+
+        logger.debug(
+            f"OCR score: '{det.text}' = {score:.1f} "
+            f"(pattern={has_pattern}, edge={det.is_edge_position}, "
+            f"area={det_area/img_area*100:.1f}%)"
+        )
 
     # Sort by score descending
     scored.sort(key=lambda x: x[0], reverse=True)
 
-    best_score, best = scored[0]
+    best_score, best_has_pattern, best = scored[0]
 
-    # Require minimum score to avoid false positives.
-    # Known watermark text (3.0) + any position easily clears this.
-    # Edge position (1.5) + high OCR conf (0.8) + small size (0.5) = 2.8 — marginal.
-    # We want to be conservative: a text in the corner that doesn't match
-    # any known pattern might be part of the actual content.
-    min_score = 2.5
+    # Different thresholds depending on whether we have a pattern match.
+    # With a pattern match (score >= 5.0 base), we're very confident.
+    # Without a pattern match, require extremely strong signals to avoid
+    # false positives on content text like titles or headings.
+    if best_has_pattern:
+        min_score = 5.0  # Pattern match alone is sufficient
+    else:
+        min_score = 4.5  # Without pattern, need edge + small + short + high conf
+
     if best_score < min_score:
         logger.debug(
             f"OCR: best candidate '{best.text}' scored {best_score:.1f} "
-            f"(below threshold {min_score})"
+            f"(below threshold {min_score}, pattern={best_has_pattern})"
         )
         return None
 
