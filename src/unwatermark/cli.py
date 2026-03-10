@@ -60,7 +60,8 @@ def main(
     handler = _get_handler(suffix)
     if handler is None:
         raise click.ClickException(
-            f"Unsupported file type: {suffix}. Supported: .png, .jpg, .jpeg, .bmp, .tiff, .pdf, .pptx"
+            f"Unsupported file type: {suffix}. "
+            "Supported: .png, .jpg, .jpeg, .bmp, .tiff, .pdf, .pptx"
         )
 
     annotation = None

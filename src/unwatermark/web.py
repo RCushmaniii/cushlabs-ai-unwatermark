@@ -16,7 +16,7 @@ from unwatermark.config import load_config
 from unwatermark.core.analyzer import analyze_watermark
 from unwatermark.models.analysis import WatermarkRegion
 from unwatermark.models.annotation import UserAnnotation
-from unwatermark.pages import APP_PAGE, HELP_PAGE, TERMS_PAGE, PRIVACY_PAGE, NOT_FOUND_PAGE
+from unwatermark.pages import APP_PAGE, HELP_PAGE, NOT_FOUND_PAGE, PRIVACY_PAGE, TERMS_PAGE
 
 app = FastAPI(title="Unwatermark", description="AI-powered watermark removal")
 

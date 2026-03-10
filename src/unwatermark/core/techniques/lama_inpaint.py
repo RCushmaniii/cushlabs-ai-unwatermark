@@ -145,7 +145,6 @@ class LamaInpaintTechnique(RemovalTechnique):
 
     def _run_modal(self, image: Image.Image, mask: Image.Image) -> Image.Image:
         """Call a Modal-deployed LaMa endpoint."""
-        import urllib.request
 
         endpoint_url = self._backend_kwargs.get("endpoint_url")
         if not endpoint_url:
@@ -159,7 +158,6 @@ class LamaInpaintTechnique(RemovalTechnique):
 
         # POST multipart to Modal endpoint
         import http.client
-        import mimetypes
         from urllib.parse import urlparse
 
         boundary = "----UnwatermarkBoundary"
@@ -172,7 +170,10 @@ class LamaInpaintTechnique(RemovalTechnique):
         )
 
         parsed = urlparse(endpoint_url)
-        conn_cls = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+        if parsed.scheme == "https":
+            conn_cls = http.client.HTTPSConnection
+        else:
+            conn_cls = http.client.HTTPConnection
         conn = conn_cls(parsed.hostname, parsed.port)
         conn.request(
             "POST",
@@ -218,8 +219,6 @@ class LamaInpaintTechnique(RemovalTechnique):
 
 def is_lama_available() -> bool:
     """Check if the LaMa inpainting package is installed."""
-    try:
-        import simple_lama_inpainting
-        return True
-    except ImportError:
-        return False
+    import importlib.util
+
+    return importlib.util.find_spec("simple_lama_inpainting") is not None

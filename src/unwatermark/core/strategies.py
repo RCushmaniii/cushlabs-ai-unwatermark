@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from unwatermark.models.analysis import (
-    BackgroundType,
     RemovalStrategy,
     WatermarkAnalysis,
 )

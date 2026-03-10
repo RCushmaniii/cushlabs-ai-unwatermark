@@ -5,7 +5,7 @@ from __future__ import annotations
 from PIL import Image
 
 from unwatermark.config import Config
-from unwatermark.core.analyzer import analyze_watermark, _heuristic_fallback
+from unwatermark.core.analyzer import _heuristic_fallback, analyze_watermark
 from unwatermark.models.analysis import WatermarkAnalysis
 from unwatermark.models.annotation import UserAnnotation
 
