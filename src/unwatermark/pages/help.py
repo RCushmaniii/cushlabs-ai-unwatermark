@@ -78,7 +78,7 @@ HELP_PAGE = page("Help", """
   <div class="prose">
     <p>Unwatermark also works as a command-line tool for batch processing:</p>
   </div>
-  <div class="card" style="font-family:monospace;font-size:0.82rem;color:var(--accent-hover);white-space:pre-wrap;line-height:1.6;background:var(--accent-light);">unwatermark image.png
+  <div class="card" style="font-family:monospace;font-size:0.82rem;color:#6b5510;white-space:pre-wrap;line-height:1.6;background:#f5f2e8;">unwatermark image.png
 unwatermark presentation.pptx -o clean.pptx
 unwatermark document.pdf --annotate "watermark in bottom-right"
 unwatermark photo.jpg --strategy solid_fill --no-ai</div>

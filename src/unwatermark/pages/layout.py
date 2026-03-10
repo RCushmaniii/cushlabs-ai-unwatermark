@@ -66,11 +66,14 @@ BASE_CSS = """
   --text-faint: #aaaaaa;
   --border: #e0e0e0;
   --border-light: #eeeeee;
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-light: #eef2ff;
-  --success: #059669;
-  --error: #dc2626;
+  --accent: #d4a017;
+  --accent-hover: #b8860b;
+  --accent-light: #fdf8e8;
+  --accent-text: #8b6914;
+  --success: #5a9a4e;
+  --success-light: #eef6ec;
+  --error: #d05050;
+  --error-light: #fdf0f0;
   --radius: 4px;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -83,7 +86,7 @@ body {
   font-weight: 400;
 }
 h1, h2, h3, h4 { color: var(--text-heading); font-weight: 600; letter-spacing: -0.02em; }
-a { color: var(--accent); text-decoration: none; transition: color 0.15s; }
+a { color: var(--accent-text); text-decoration: none; transition: color 0.15s; }
 a:hover { color: var(--accent-hover); }
 
 /* Nav */
@@ -105,7 +108,7 @@ a:hover { color: var(--accent-hover); }
 .nav-logo {
   display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; border-radius: var(--radius);
-  background: var(--accent); color: #fff; font-size: 0.8rem; font-weight: 700;
+  background: var(--bg-dark); color: #fff; font-size: 0.8rem; font-weight: 700;
 }
 .nav-links { display: flex; gap: 1.5rem; }
 .nav-link {
@@ -114,7 +117,7 @@ a:hover { color: var(--accent-hover); }
   transition: all 0.15s;
 }
 .nav-link:hover { color: var(--text-heading); }
-.nav-link.active { color: var(--accent); border-bottom-color: var(--accent); }
+.nav-link.active { color: var(--accent-text); border-bottom-color: var(--accent); }
 
 /* Main */
 .main {
@@ -138,11 +141,11 @@ a:hover { color: var(--accent-hover); }
 }
 .footer-name { font-weight: 600; color: #ffffff; }
 .footer-sep { color: #555555; }
-.footer-cushlabs { color: #a5b4fc; font-weight: 600; }
-.footer-cushlabs:hover { color: #c7d2fe; }
+.footer-cushlabs { color: #e8c34a; font-weight: 600; }
+.footer-cushlabs:hover { color: #f0d76a; }
 .footer-links { display: flex; gap: 1.25rem; font-size: 0.78rem; }
 .footer-links a { color: #999999; }
-.footer-links a:hover { color: #ffffff; }
+.footer-links a:hover { color: #e8c34a; }
 .footer-copy {
   font-size: 0.72rem; color: #666666; width: 100%;
   text-align: center; margin-top: 0.25rem;
@@ -165,8 +168,8 @@ a:hover { color: var(--accent-hover); }
 .prose li { margin-bottom: 0.4rem; }
 .prose strong { color: var(--text-heading); font-weight: 600; }
 .prose code {
-  background: var(--accent-light); padding: 0.15rem 0.4rem; border-radius: 2px;
-  font-size: 0.85em; color: var(--accent-hover);
+  background: #f5f2e8; padding: 0.15rem 0.4rem; border-radius: 2px;
+  font-size: 0.85em; color: #6b5510;
 }
 .card {
   background: var(--bg-primary); border: 1px solid var(--border);
@@ -180,8 +183,8 @@ a:hover { color: var(--accent-hover); }
   font-family: inherit; font-size: 0.85rem; font-weight: 600;
   cursor: pointer; transition: all 0.15s; white-space: nowrap;
 }
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary { background: var(--accent); color: var(--text-heading); }
+.btn-primary:hover { background: var(--accent-hover); color: var(--text-heading); }
 .btn-secondary {
   background: var(--bg-primary); color: var(--text-body);
   border: 1px solid var(--border);
@@ -194,8 +197,8 @@ a:hover { color: var(--accent-hover); }
 @keyframes spin { to { transform: rotate(360deg); } }
 .spinner {
   width: 14px; height: 14px;
-  border: 2px solid rgba(255,255,255,0.3);
-  border-top-color: #fff; border-radius: 50%;
+  border: 2px solid rgba(0,0,0,0.15);
+  border-top-color: var(--text-heading); border-radius: 50%;
   animation: spin 0.6s linear infinite; display: inline-block;
 }
 
@@ -210,7 +213,7 @@ a:hover { color: var(--accent-hover); }
   letter-spacing: 0.06em; color: var(--text-faint);
   border-bottom: 2px solid transparent; transition: all 0.2s;
 }
-.step-indicator.active { color: var(--accent); border-bottom-color: var(--accent); }
+.step-indicator.active { color: var(--accent-text); border-bottom-color: var(--accent); }
 .step-indicator.done { color: var(--success); border-bottom-color: var(--success); }
 .step-num {
   display: inline-flex; align-items: center; justify-content: center;
@@ -218,7 +221,7 @@ a:hover { color: var(--accent-hover); }
   background: var(--border-light); color: var(--text-faint); font-size: 0.65rem;
   margin-right: 0.35rem; font-weight: 700;
 }
-.step-indicator.active .step-num { background: var(--accent); color: #fff; }
+.step-indicator.active .step-num { background: var(--accent); color: var(--text-heading); }
 .step-indicator.done .step-num { background: var(--success); color: #fff; }
 
 /* Status */

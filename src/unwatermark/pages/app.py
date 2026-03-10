@@ -218,7 +218,7 @@ input[type="file"] { display: none; }
   padding: 0.5rem 0.7rem; border-radius: var(--radius); font-size: 0.85rem;
   font-family: inherit; transition: border-color 0.15s;
 }
-.control-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(79,70,229,0.1); }
+.control-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(212,160,23,0.15); }
 .control-input::placeholder { color: var(--text-faint); }
 .btn-full { width: 100%; }
 
@@ -250,12 +250,12 @@ input[type="file"] { display: none; }
 
 /* Error alert */
 .error-alert {
-  background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius);
+  background: var(--error-light); border: 1px solid #e8b4b4; border-radius: var(--radius);
   padding: 0.65rem 0.85rem; margin-top: 0.85rem; display: flex; gap: 0.4rem;
   align-items: flex-start;
 }
 .error-alert svg { flex-shrink: 0; margin-top: 1px; }
-.error-alert p { font-size: 0.82rem; color: #991b1b; line-height: 1.4; }
+.error-alert p { font-size: 0.82rem; color: #8b2020; line-height: 1.4; }
 
 /* Compare */
 .compare-container {
@@ -347,7 +347,7 @@ function showError(message) {
   getStatus().innerHTML = '';
   getAnalysisResult().innerHTML =
     '<div class="error-alert">' +
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' +
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d05050" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' +
     '<p>' + message + '</p></div>';
 }
 
@@ -427,7 +427,7 @@ canvas.addEventListener('mousemove', e => {
   const cx = (e.clientX - r.left) * scaleX;
   const cy = (e.clientY - r.top) * scaleY;
   redrawCanvas();
-  ctx.strokeStyle = 'var(--accent, #4f46e5)'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+  ctx.strokeStyle = '#d4a017'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
   ctx.strokeRect(startX, startY, cx - startX, cy - startY);
   ctx.setLineDash([]);
 });
@@ -480,12 +480,12 @@ function redrawCanvas() {
 function drawRect(r) {
   const scale = parseFloat(canvas.dataset.scale) || 1;
   const x = r.x * scale, y = r.y * scale, w = r.w * scale, h = r.h * scale;
-  ctx.fillStyle = 'rgba(79, 70, 229, 0.08)';
+  ctx.fillStyle = 'rgba(212, 160, 23, 0.1)';
   ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = '#4f46e5'; ctx.lineWidth = 2; ctx.setLineDash([]);
+  ctx.strokeStyle = '#d4a017'; ctx.lineWidth = 2; ctx.setLineDash([]);
   ctx.strokeRect(x, y, w, h);
   const hs = 4;
-  ctx.fillStyle = '#4f46e5';
+  ctx.fillStyle = '#d4a017';
   [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].forEach(([cx, cy]) => {
     ctx.fillRect(cx - hs, cy - hs, hs * 2, hs * 2);
   });
