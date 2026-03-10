@@ -20,7 +20,7 @@ HELP_PAGE = page("Help", """
 <div class="section">
   <h2 class="section-title">Step-by-Step Guide</h2>
   <div class="card">
-    <h3 style="color:#0f172a;font-size:0.95rem;margin-bottom:0.5rem;">Step 1 — Upload</h3>
+    <h3 style="color:var(--text-heading);font-size:0.92rem;margin-bottom:0.5rem;">Step 1 — Upload</h3>
     <div class="prose">
       <p>Drag and drop a file onto the upload zone, or click to browse. Supported formats:</p>
       <ul>
@@ -32,19 +32,19 @@ HELP_PAGE = page("Help", """
     </div>
   </div>
   <div class="card">
-    <h3 style="color:#0f172a;font-size:0.95rem;margin-bottom:0.5rem;">Step 2 — Annotate &amp; Analyze</h3>
+    <h3 style="color:var(--text-heading);font-size:0.92rem;margin-bottom:0.5rem;">Step 2 — Annotate or Describe</h3>
     <div class="prose">
       <p>For image files, you'll see your image in an interactive canvas. You have two optional tools:</p>
       <ul>
         <li><strong>Draw a rectangle</strong> — Click and drag to mark where the watermark is. This gives the AI a strong hint and improves accuracy.</li>
         <li><strong>Text description</strong> — Describe the watermark in plain language, e.g. "gray NotebookLM text in the bottom-right corner."</li>
       </ul>
-      <p>Both are optional. Click <strong>Analyze with AI</strong> and the system will detect the watermark, highlight it on your image, and recommend the best removal strategy.</p>
-      <p>You can override the AI's strategy using the dropdown before removing.</p>
+      <p>For PDFs and PPTX files, you'll describe the watermark in a text field. Each page or slide is analyzed independently.</p>
+      <p>Click <strong>Analyze with AI</strong> and the system will detect the watermark, highlight it on your image, and recommend the best removal strategy.</p>
     </div>
   </div>
   <div class="card">
-    <h3 style="color:#0f172a;font-size:0.95rem;margin-bottom:0.5rem;">Step 3 — Compare &amp; Download</h3>
+    <h3 style="color:var(--text-heading);font-size:0.92rem;margin-bottom:0.5rem;">Step 3 — Compare &amp; Download</h3>
     <div class="prose">
       <p>After removal, a before/after slider lets you drag left and right to compare the original and cleaned versions. If the result isn't perfect:</p>
       <ul>
@@ -78,7 +78,7 @@ HELP_PAGE = page("Help", """
   <div class="prose">
     <p>Unwatermark also works as a command-line tool for batch processing:</p>
   </div>
-  <div class="card" style="font-family:monospace;font-size:0.85rem;color:#4338ca;white-space:pre-wrap;line-height:1.6;background:#f5f3ff;">unwatermark image.png
+  <div class="card" style="font-family:monospace;font-size:0.82rem;color:var(--accent-hover);white-space:pre-wrap;line-height:1.6;background:var(--accent-light);">unwatermark image.png
 unwatermark presentation.pptx -o clean.pptx
 unwatermark document.pdf --annotate "watermark in bottom-right"
 unwatermark photo.jpg --strategy solid_fill --no-ai</div>
