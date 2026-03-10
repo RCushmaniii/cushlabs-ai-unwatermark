@@ -26,38 +26,46 @@ from unwatermark.models.annotation import UserAnnotation
 
 logger = logging.getLogger(__name__)
 
-ANALYSIS_PROMPT = """You are a watermark detection expert. Analyze this image and identify any watermarks.
+_ANALYSIS_PROMPT_TEMPLATE = (
+    "You are a watermark detection expert. Analyze this image and identify any watermarks.\n"
+    "\n"
+    "Return a JSON object with these exact fields:\n"
+    "{\n"
+    '  "watermark_found": true/false,\n'
+    '  "bounding_box": {"x": int, "y": int, "width": int, "height": int},\n'
+    '  "description": "what the watermark looks like and says",\n'
+    '  "background_type": "solid_color" | "gradient" | "simple_texture"'
+    ' | "complex_content" | "mixed",\n'
+    '  "background_color": "#hex or null if not solid",\n'
+    '  "recommended_strategy": "solid_fill" | "gradient_fill"'
+    ' | "clone_stamp" | "inpaint",\n'
+    '  "confidence": 0.0-1.0,\n'
+    '  "reasoning": "brief explanation of why you chose this strategy",\n'
+    '  "context": {\n'
+    '    "above": "what is above the watermark",\n'
+    '    "below": "what is below the watermark",\n'
+    '    "left": "what is left of the watermark",\n'
+    '    "right": "what is right of the watermark"\n'
+    "  },\n"
+    '  "clone_direction": "above" | "below" | "left" | "right"\n'
+    "}\n"
+    "\n"
+    "Rules for strategy selection:\n"
+    '- "solid_fill": Watermark on a solid color background.\n'
+    '- "gradient_fill": Watermark on a smooth gradient.\n'
+    '- "clone_stamp": Similar content adjacent that can be mirrored.\n'
+    '- "inpaint": Complex backgrounds with text, photos, or diagrams.\n'
+    "\n"
+    '"clone_direction": pick the direction with the most similar content.\n'
+    "\n"
+    "The image dimensions are WIDTHxHEIGHT pixels. Return pixel coordinates.\n"
+    "\n"
+    "Return ONLY the JSON object, no markdown formatting or extra text."
+)
 
-Return a JSON object with these exact fields:
-{
-  "watermark_found": true/false,
-  "bounding_box": {"x": int, "y": int, "width": int, "height": int},
-  "description": "what the watermark looks like and says",
-  "background_type": "solid_color" | "gradient" | "simple_texture" | "complex_content" | "mixed",
-  "background_color": "#hex or null if not solid",
-  "recommended_strategy": "solid_fill" | "gradient_fill" | "clone_stamp" | "inpaint",
-  "confidence": 0.0-1.0,
-  "reasoning": "brief explanation of why you chose this strategy",
-  "context": {
-    "above": "what's above the watermark",
-    "below": "what's below the watermark",
-    "left": "what's left of the watermark",
-    "right": "what's right of the watermark"
-  },
-  "clone_direction": "above" | "below" | "left" | "right"
-}
 
-Rules for strategy selection:
-- "solid_fill": Use when the watermark sits on a solid color background. Cheapest and most perfect result.
-- "gradient_fill": Use when background is a smooth gradient.
-- "clone_stamp": Use when there's similar content adjacent that can be mirrored over the watermark.
-- "inpaint": Use for complex backgrounds with text, photos, or diagrams behind the watermark.
-
-For "clone_direction": pick the direction that has the most similar content to what's likely behind the watermark.
-
-The image dimensions are {width}x{height} pixels. Return pixel coordinates for the bounding box.
-
-Return ONLY the JSON object, no markdown formatting or extra text."""
+def _build_prompt(width: int, height: int) -> str:
+    return _ANALYSIS_PROMPT_TEMPLATE.replace("WIDTHxHEIGHT", f"{width}x{height}")
 
 
 def analyze_watermark(
@@ -79,7 +87,7 @@ def analyze_watermark(
         logger.warning("AI analysis unavailable (no API key). Falling back to heuristic.")
         return _heuristic_fallback(image, annotation)
 
-    prompt = ANALYSIS_PROMPT.format(width=image.width, height=image.height)
+    prompt = _build_prompt(image.width, image.height)
 
     if annotation and annotation.has_description:
         prompt += f"\n\nUser hint: {annotation.description}"
