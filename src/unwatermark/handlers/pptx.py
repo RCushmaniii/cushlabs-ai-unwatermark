@@ -7,6 +7,7 @@ Targets the common case: slides that are each a single full-size PNG image
 from __future__ import annotations
 
 import io
+import logging
 from pathlib import Path
 from typing import Callable
 
@@ -17,6 +18,8 @@ from unwatermark.config import Config
 from unwatermark.core.detector import detect_watermark
 from unwatermark.core.remover import remove_watermark
 from unwatermark.models.annotation import UserAnnotation
+
+logger = logging.getLogger(__name__)
 
 
 def process_pptx(
@@ -70,8 +73,16 @@ def process_pptx(
 
             image_bytes = image_part.blob
             image = Image.open(io.BytesIO(image_bytes))
+            logger.info(
+                f"Slide {slide_idx + 1}: found image {image.width}x{image.height} "
+                f"({image_part.content_type})"
+            )
 
             analysis = detect_watermark(image, config, annotation)
+            logger.info(
+                f"Slide {slide_idx + 1}: watermark_found={analysis.watermark_found}, "
+                f"confidence={analysis.confidence}, strategy={analysis.strategy.value}"
+            )
             if not analysis.watermark_found:
                 continue
 

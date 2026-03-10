@@ -35,9 +35,9 @@ FAVICON_SVG = (
     'font-size="22" fill="#fff">U</text></svg>'
 )
 
-# In-memory store for completed downloads (token → file path)
-_downloads: dict[str, Path] = {}
-_download_names: dict[str, str] = {}
+# Download token store — persists to disk so tokens survive server reloads
+_DOWNLOAD_DIR = Path(tempfile.gettempdir()) / "unwatermark_downloads"
+_DOWNLOAD_DIR.mkdir(exist_ok=True)
 
 
 # ---------------------------------------------------------------------------
@@ -220,10 +220,15 @@ async def process_file(
 
     def run_handler() -> None:
         try:
+            logger.info(
+                f"Starting handler: input={input_path}, output={output_path}, "
+                f"suffix={suffix}, strategy={force_strategy}"
+            )
             handler(
                 input_path, output_path, config, annotation, force_strategy,
                 on_progress=on_progress,
             )
+            logger.info(f"Handler completed. Output exists: {output_path.exists()}")
         except Exception as e:
             logger.exception("Processing failed")
             error_holder.append(_friendly_error(e))
@@ -251,8 +256,10 @@ async def process_file(
             yield json.dumps({"type": "error", "message": error_holder[0]}) + "\n"
         else:
             token = str(uuid.uuid4())[:8]
-            _downloads[token] = output_path
-            _download_names[token] = f"clean_{original_filename}"
+            # Persist token mapping to disk so it survives server reloads
+            meta = {"path": str(output_path), "name": f"clean_{original_filename}"}
+            (_DOWNLOAD_DIR / f"{token}.json").write_text(json.dumps(meta))
+            logger.info(f"Download ready: token={token}, path={output_path}")
             yield json.dumps({"type": "complete", "download_token": token}) + "\n"
 
     return StreamingResponse(event_stream(), media_type="application/x-ndjson")
@@ -261,10 +268,23 @@ async def process_file(
 @app.get("/download/{token}")
 async def download_file(token: str):
     """Download a processed file by token."""
-    path = _downloads.pop(token, None)
-    name = _download_names.pop(token, "clean_file")
-    if path is None or not path.exists():
+    meta_file = _DOWNLOAD_DIR / f"{token}.json"
+    if not meta_file.exists():
+        logger.error(f"Token {token} not found — meta file missing at {meta_file}")
         return JSONResponse({"error": "Download expired or not found."}, status_code=404)
+
+    meta = json.loads(meta_file.read_text())
+    path = Path(meta["path"])
+    name = meta.get("name", "clean_file")
+
+    if not path.exists():
+        logger.error(f"Output file does not exist: {path}")
+        meta_file.unlink(missing_ok=True)
+        return JSONResponse({"error": "Download expired or not found."}, status_code=404)
+
+    logger.info(f"Serving download: {path} ({path.stat().st_size} bytes) as {name}")
+    # Clean up meta file after serving
+    meta_file.unlink(missing_ok=True)
     return FileResponse(
         path=str(path), filename=name, media_type="application/octet-stream"
     )
