@@ -17,6 +17,7 @@ from pptx import Presentation
 from unwatermark.config import Config
 from unwatermark.core.detector import detect_watermark
 from unwatermark.core.remover import remove_watermark
+from unwatermark.models.analysis import WatermarkAnalysis
 from unwatermark.models.annotation import UserAnnotation
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,12 @@ def process_pptx(
             f"Split the file or use the CLI for larger presentations."
         )
 
+    # Track the first successful detection so we can reuse it as a fallback.
+    # Watermarked presentations (e.g., NotebookLM) have the same watermark on
+    # every slide, so if the AI misses it on one slide, we can use the bounding
+    # box from a slide where it succeeded.
+    baseline_analysis: WatermarkAnalysis | None = None
+
     for slide_idx, slide in enumerate(prs.slides):
         pct = int(5 + (slide_idx / slide_count) * 90)
         if on_progress:
@@ -84,8 +91,29 @@ def process_pptx(
                 f"Slide {slide_idx + 1}: watermark_found={analysis.watermark_found}, "
                 f"confidence={analysis.confidence}, strategy={analysis.strategy.value}"
             )
-            if not analysis.watermark_found:
-                continue
+
+            if analysis.watermark_found:
+                # Save as baseline for slides where detection fails
+                if baseline_analysis is None:
+                    baseline_analysis = analysis
+                    logger.info(
+                        f"Slide {slide_idx + 1}: saved as baseline detection "
+                        f"(region={analysis.region.x},{analysis.region.y},"
+                        f"{analysis.region.width}x{analysis.region.height})"
+                    )
+            else:
+                # AI missed it — reuse baseline if we have one
+                if baseline_analysis is not None:
+                    logger.info(
+                        f"Slide {slide_idx + 1}: AI missed watermark, "
+                        f"reusing baseline detection from earlier slide"
+                    )
+                    analysis = baseline_analysis
+                else:
+                    logger.info(
+                        f"Slide {slide_idx + 1}: no watermark found and no baseline yet"
+                    )
+                    continue
 
             cleaned = remove_watermark(image, analysis, config, force_strategy)
 
