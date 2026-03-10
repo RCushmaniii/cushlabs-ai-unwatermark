@@ -97,6 +97,32 @@ async def analyze_file(
     config = load_config()
 
     if not is_image:
+        # Extract first page/slide as an image and run real AI analysis on it
+        preview_image = _extract_preview(content, suffix)
+        if preview_image is not None:
+            try:
+                analysis = analyze_watermark(preview_image, config, annotation)
+                return JSONResponse({
+                    "watermark_found": analysis.watermark_found,
+                    "region": {
+                        "x": analysis.region.x,
+                        "y": analysis.region.y,
+                        "width": analysis.region.width,
+                        "height": analysis.region.height,
+                    },
+                    "description": analysis.description,
+                    "background_type": analysis.background_type.value,
+                    "strategy": analysis.strategy.value,
+                    "confidence": analysis.confidence,
+                    "reasoning": (
+                        f"Analyzed first page preview. {analysis.reasoning} "
+                        "Each page will be analyzed independently during processing."
+                    ),
+                })
+            except Exception as e:
+                logger.warning(f"Preview analysis failed, using fallback: {e}")
+
+        # Fallback if preview extraction fails
         return JSONResponse({
             "watermark_found": True,
             "region": {"x": 0, "y": 0, "width": 0, "height": 0},
@@ -105,7 +131,8 @@ async def analyze_file(
             "strategy": "clone_stamp",
             "confidence": 0.5,
             "reasoning": (
-                "Document files are analyzed page-by-page during processing. "
+                "Could not preview this document type. "
+                "Each page will be analyzed during processing. "
                 "Click Remove Watermark to proceed."
             ),
         })
@@ -282,6 +309,47 @@ def _build_annotation(
             x=region_x, y=region_y, width=region_w, height=region_h
         )
     return UserAnnotation(description=description, region=region)
+
+
+def _extract_preview(content: bytes, suffix: str) -> Image.Image | None:
+    """Extract the first page/slide from a document as a PIL Image for analysis."""
+    try:
+        if suffix == ".pptx":
+            from pptx import Presentation
+
+            prs = Presentation(io.BytesIO(content))
+            if not prs.slides:
+                return None
+            # Find the first image in the first slide
+            slide = prs.slides[0]
+            for shape in slide.shapes:
+                if not shape.shape_type or not hasattr(shape, "image"):
+                    continue
+                try:
+                    image_part = shape.image
+                    return Image.open(io.BytesIO(image_part.blob))
+                except Exception:
+                    continue
+            return None
+
+        elif suffix == ".pdf":
+            import fitz
+
+            doc = fitz.open(stream=content, filetype="pdf")
+            if len(doc) == 0:
+                doc.close()
+                return None
+            page = doc[0]
+            # Render at 150 DPI for a quick preview
+            zoom = 150 / 72.0
+            pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
+            image = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+            doc.close()
+            return image
+
+    except Exception as e:
+        logger.warning(f"Failed to extract preview from {suffix}: {e}")
+    return None
 
 
 def _friendly_error(exc: Exception) -> str:
