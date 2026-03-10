@@ -68,9 +68,9 @@ BASE_CSS = """
   --border: #e2e8f0;
   --border-light: #f1f5f9;
   /* 10% — Single accent */
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-light: #eef2ff;
+  --accent: #0047ab;
+  --accent-hover: #003580;
+  --accent-light: #e8f0fc;
   /* Semantic — status only */
   --error: #dc2626;
   --error-bg: #fef2f2;
@@ -147,8 +147,8 @@ a:hover { color: var(--accent-hover); }
 }
 .footer-name { font-weight: 700; color: #ffffff; }
 .footer-sep { color: #475569; }
-.footer-cushlabs { color: #818cf8; font-weight: 600; }
-.footer-cushlabs:hover { color: #a5b4fc; }
+.footer-cushlabs { color: #5b9bd5; font-weight: 600; }
+.footer-cushlabs:hover { color: #7db8e8; }
 .footer-links { display: flex; gap: 1.25rem; font-size: 0.78rem; }
 .footer-links a { color: #94a3b8; }
 .footer-links a:hover { color: #ffffff; }

@@ -183,7 +183,10 @@ def _analyze_with_claude(
     """Send image to Claude for analysis."""
     import anthropic
 
-    client = anthropic.Anthropic(api_key=config.anthropic_api_key)
+    client = anthropic.Anthropic(
+        api_key=config.anthropic_api_key,
+        timeout=30.0,
+    )
     img_b64 = _image_to_base64(image)
 
     message = client.messages.create(
@@ -222,12 +225,13 @@ def _analyze_with_openai(
     """Send image to GPT-4o for analysis."""
     from openai import OpenAI
 
-    client = OpenAI(api_key=config.openai_api_key)
+    client = OpenAI(api_key=config.openai_api_key, timeout=30.0)
     img_b64 = _image_to_base64(image)
 
     response = client.chat.completions.create(
         model=config.analysis_model if "gpt" in config.analysis_model else "gpt-4o",
         max_tokens=1024,
+        timeout=30.0,
         messages=[
             {
                 "role": "user",

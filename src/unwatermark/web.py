@@ -26,7 +26,7 @@ app = FastAPI(title="Unwatermark", description="AI-powered watermark removal")
 # Inline SVG favicon — indigo "U" on transparent background
 FAVICON_SVG = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
-    '<rect width="32" height="32" rx="4" fill="#4f46e5"/>'
+    '<rect width="32" height="32" rx="4" fill="#0047ab"/>'
     '<text x="16" y="24" text-anchor="middle" '
     'font-family="Inter,system-ui,sans-serif" font-weight="700" '
     'font-size="22" fill="#fff">U</text></svg>'

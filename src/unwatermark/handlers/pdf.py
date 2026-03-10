@@ -37,13 +37,23 @@ def process_pdf(
     Returns:
         Path to the output file.
     """
+    MAX_PAGES = 20
+
     src_doc = fitz.open(str(input_path))
     out_doc = fitz.open()
+
+    page_count = len(src_doc)
+    if page_count > MAX_PAGES:
+        src_doc.close()
+        raise ValueError(
+            f"PDF has {page_count} pages (max {MAX_PAGES}). "
+            f"Split the file or use the CLI for larger documents."
+        )
 
     zoom = dpi / 72.0
     matrix = fitz.Matrix(zoom, zoom)
 
-    for page_idx in range(len(src_doc)):
+    for page_idx in range(page_count):
         page = src_doc[page_idx]
         pix = page.get_pixmap(matrix=matrix)
 

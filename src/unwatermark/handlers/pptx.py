@@ -40,7 +40,15 @@ def process_pptx(
     Returns:
         Path to the output file.
     """
+    MAX_SLIDES = 20
+
     prs = Presentation(str(input_path))
+
+    if len(prs.slides) > MAX_SLIDES:
+        raise ValueError(
+            f"PPTX has {len(prs.slides)} slides (max {MAX_SLIDES}). "
+            f"Split the file or use the CLI for larger presentations."
+        )
 
     for slide in prs.slides:
         for shape in slide.shapes:
