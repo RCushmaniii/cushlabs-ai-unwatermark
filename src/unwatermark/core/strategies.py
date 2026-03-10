@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 
 from unwatermark.models.analysis import (
-    BackgroundType,
     RemovalStrategy,
     WatermarkAnalysis,
 )
@@ -36,19 +35,15 @@ def select_strategy(
     if force_strategy:
         return RemovalStrategy(force_strategy)
 
+    # When LaMa is available, ALWAYS use it — it produces the best results
+    # across all background types. Solid fill and clone stamp leave visible
+    # artifacts on anything other than perfectly uniform backgrounds.
+    if inpaint_available:
+        return RemovalStrategy.INPAINT
+
+    # Fallback when LaMa is not installed
     strategy = analysis.strategy
-
-    # When inpainting is available, prefer it for complex backgrounds
-    # even if the AI recommended clone_stamp (inpaint is almost always better)
-    if inpaint_available and analysis.background_type in (
-        BackgroundType.COMPLEX_CONTENT,
-        BackgroundType.MIXED,
-        BackgroundType.SIMPLE_TEXTURE,
-    ):
-        strategy = RemovalStrategy.INPAINT
-
-    # If inpainting was recommended but isn't available, fall back to clone stamp
-    if strategy == RemovalStrategy.INPAINT and not inpaint_available:
+    if strategy == RemovalStrategy.INPAINT:
         logger.warning("Inpaint requested but LaMa unavailable — using clone_stamp")
         strategy = RemovalStrategy.CLONE_STAMP
 

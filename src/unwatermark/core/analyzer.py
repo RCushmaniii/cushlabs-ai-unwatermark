@@ -43,9 +43,11 @@ _ANALYSIS_PROMPT_TEMPLATE = (
     "- x increases going RIGHT, y increases going DOWN\n"
     "- The image is WIDTHxHEIGHT pixels\n"
     "- Your bounding box MUST use absolute pixel coordinates\n"
-    "- The bounding box must FULLY contain the watermark with some margin\n"
-    "- Example: a watermark in the bottom-right of a 1920x1080 image might be "
-    'at {"x": 1400, "y": 1020, "width": 500, "height": 50}\n'
+    "- The bounding box must TIGHTLY fit the watermark — include only the watermark "
+    "text/logo itself plus 2-3 pixels of margin. Do NOT include large areas of "
+    "background. A tight box produces much better removal results.\n"
+    "- Example: a small 'NotebookLM' watermark in the bottom-right of a 1376x768 "
+    'image might be at {"x": 1180, "y": 730, "width": 180, "height": 30}\n'
     "\n"
     "Return a JSON object with these exact fields:\n"
     "{\n"
@@ -177,9 +179,10 @@ def _parse_analysis_json(raw: str, image: Image.Image) -> WatermarkAnalysis:
 
     ctx = data.get("context", {})
 
-    # Use percentage-based padding (3% of image dimensions) instead of fixed 10px
-    pad_x = max(10, int(image.width * 0.03))
-    pad_y = max(10, int(image.height * 0.03))
+    # Minimal padding — just enough to ensure we capture the full watermark
+    # without including excessive background that degrades removal quality
+    pad_x = max(5, int(image.width * 0.01))
+    pad_y = max(5, int(image.height * 0.01))
     padded_region = region.padded_xy(pad_x, pad_y, image.width, image.height)
 
     return WatermarkAnalysis(
