@@ -1,0 +1,310 @@
+"""OCR-based watermark detection — deterministic, fast, local.
+
+Uses EasyOCR to find text overlays in images. Unlike vision LLMs, this
+produces the same result every time for the same input. It catches text
+watermarks like "NotebookLM", "Shutterstock", "Getty Images", etc.
+
+This is the primary detection layer. The AI vision model (Claude/GPT-4o)
+is only used as a fallback when OCR finds nothing (logo watermarks, etc.).
+"""
+
+from __future__ import annotations
+
+import logging
+import re
+from dataclasses import dataclass
+
+import numpy as np
+from PIL import Image
+
+from unwatermark.models.analysis import (
+    BackgroundType,
+    RemovalStrategy,
+    SurroundingContext,
+    WatermarkAnalysis,
+    WatermarkRegion,
+)
+
+logger = logging.getLogger(__name__)
+
+# Common watermark text patterns (case-insensitive).
+# These are strong signals — if OCR finds any of these, it's almost
+# certainly a watermark, even if it's in the middle of the image.
+_WATERMARK_PATTERNS = [
+    r"notebooklm",
+    r"shutterstock",
+    r"getty\s*images?",
+    r"istock\s*photo",
+    r"adobe\s*stock",
+    r"dream(?:s)?time",
+    r"123rf",
+    r"alamy",
+    r"deposit\s*photos?",
+    r"fotolia",
+    r"bigstock",
+    r"canva",
+    r"unsplash",
+    r"pexels",
+    r"pixabay",
+    r"freepik",
+    r"envato",
+    r"made\s+with",
+    r"created\s+(?:with|by|in)",
+    r"powered\s+by",
+    r"generated\s+(?:with|by)",
+    r"sample",
+    r"preview",
+    r"watermark",
+    r"draft",
+    r"proof",
+    r"comp(?:osite)?(?:\s+image)?",
+    r"for\s+review\s+only",
+    r"not\s+for\s+(?:re)?sale",
+    r"copyright\s*\u00a9?",
+    r"\u00a9\s*\d{4}",
+    r"www\.\w+\.\w+",
+]
+
+# Lazy-loaded EasyOCR reader (heavy initialization — only do it once)
+_reader = None
+
+
+def _get_reader():
+    """Get or create the EasyOCR reader (lazy singleton)."""
+    global _reader
+    if _reader is None:
+        import easyocr
+        logger.info("Initializing EasyOCR reader (first use)...")
+        _reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+        logger.info("EasyOCR reader ready")
+    return _reader
+
+
+@dataclass
+class OCRDetection:
+    """A single text detection from OCR."""
+
+    text: str
+    bbox: tuple[int, int, int, int]  # x, y, width, height
+    confidence: float
+    is_watermark_text: bool  # matches known watermark patterns
+    is_edge_position: bool  # in typical watermark position (corners/edges)
+
+
+def detect_watermark_ocr(
+    image: Image.Image,
+    known_text: str | None = None,
+) -> WatermarkAnalysis | None:
+    """Detect text watermarks using OCR.
+
+    Args:
+        image: PIL Image to scan.
+        known_text: Optional hint about what the watermark says (from user annotation).
+
+    Returns:
+        WatermarkAnalysis if a watermark is detected, None if no text watermark found.
+        Returns None (not watermark_found=False) so the caller knows to try AI detection.
+    """
+    reader = _get_reader()
+    img_array = np.array(image.convert("RGB"))
+    img_w, img_h = image.size
+
+    # EasyOCR returns list of (bbox, text, confidence)
+    # bbox is [[x1,y1], [x2,y1], [x2,y2], [x1,y2]] (polygon corners)
+    results = reader.readtext(img_array)
+
+    if not results:
+        logger.info("OCR: no text found in image")
+        return None
+
+    # Score each detection
+    detections: list[OCRDetection] = []
+    for bbox_poly, text, conf in results:
+        # Convert polygon to bounding rect
+        xs = [p[0] for p in bbox_poly]
+        ys = [p[1] for p in bbox_poly]
+        x = int(min(xs))
+        y = int(min(ys))
+        w = int(max(xs) - min(xs))
+        h = int(max(ys) - min(ys))
+
+        # Check if text matches watermark patterns
+        is_wm_text = _is_watermark_text(text, known_text)
+
+        # Check if position is typical for watermarks (edges/corners)
+        is_edge = _is_edge_position(x, y, w, h, img_w, img_h)
+
+        detections.append(OCRDetection(
+            text=text,
+            bbox=(x, y, w, h),
+            confidence=conf,
+            is_watermark_text=is_wm_text,
+            is_edge_position=is_edge,
+        ))
+
+        logger.debug(
+            f"OCR: '{text}' conf={conf:.2f} pos=({x},{y},{w}x{h}) "
+            f"wm_text={is_wm_text} edge={is_edge}"
+        )
+
+    # Find the best watermark candidate
+    watermark = _select_best_watermark(detections, img_w, img_h)
+    if watermark is None:
+        logger.info(
+            f"OCR: found {len(detections)} text regions but none look like watermarks"
+        )
+        return None
+
+    # Build the analysis result
+    x, y, w, h = watermark.bbox
+
+    # Add minimal padding
+    pad_x = max(5, int(img_w * 0.01))
+    pad_y = max(5, int(img_h * 0.01))
+    region = WatermarkRegion(x=x, y=y, width=w, height=h)
+    padded = region.padded_xy(pad_x, pad_y, img_w, img_h)
+
+    logger.info(
+        f"OCR: detected watermark '{watermark.text}' at ({x},{y},{w}x{h}) "
+        f"conf={watermark.confidence:.2f}"
+    )
+
+    return WatermarkAnalysis(
+        watermark_found=True,
+        region=padded,
+        description=f"Text watermark: '{watermark.text}'",
+        background_type=BackgroundType.MIXED,
+        strategy=RemovalStrategy.INPAINT,
+        confidence=min(0.95, watermark.confidence + 0.1),  # boost slightly — OCR is reliable
+        reasoning=f"OCR detected text '{watermark.text}' in watermark-typical position",
+        context=SurroundingContext(),
+        clone_direction=_best_clone_direction(x, y, w, h, img_w, img_h),
+    )
+
+
+def _is_watermark_text(text: str, known_text: str | None = None) -> bool:
+    """Check if detected text matches known watermark patterns."""
+    lower = text.lower().strip()
+
+    # Very short text is usually noise
+    if len(lower) < 2:
+        return False
+
+    # Check user-provided hint first
+    if known_text:
+        hint_lower = known_text.lower()
+        # Fuzzy match — the OCR might get a few characters wrong
+        hint_words = hint_lower.split()
+        for word in hint_words:
+            if len(word) >= 3 and word in lower:
+                return True
+
+    # Check against known watermark patterns
+    for pattern in _WATERMARK_PATTERNS:
+        if re.search(pattern, lower):
+            return True
+
+    return False
+
+
+def _is_edge_position(
+    x: int, y: int, w: int, h: int, img_w: int, img_h: int
+) -> bool:
+    """Check if a text region is in a typical watermark position.
+
+    Watermarks are almost always in corners or along edges — rarely
+    in the center of the image (unless they're diagonal repeating).
+    """
+    cx = x + w / 2
+    cy = y + h / 2
+
+    # Define edge zones: outer 20% of image on each side
+    margin_x = img_w * 0.20
+    margin_y = img_h * 0.20
+
+    in_left = cx < margin_x
+    in_right = cx > img_w - margin_x
+    in_top = cy < margin_y
+    in_bottom = cy > img_h - margin_y
+
+    return in_left or in_right or in_top or in_bottom
+
+
+def _select_best_watermark(
+    detections: list[OCRDetection],
+    img_w: int,
+    img_h: int,
+) -> OCRDetection | None:
+    """Pick the most likely watermark from OCR detections.
+
+    Scoring:
+    - Known watermark text: +3.0 (strongest signal)
+    - Edge/corner position: +1.5
+    - User hint match: already reflected in is_watermark_text
+    - Small relative size (< 15% of image area): +0.5
+    - OCR confidence: +0.0 to +1.0
+    """
+    if not detections:
+        return None
+
+    img_area = img_w * img_h
+    scored: list[tuple[float, OCRDetection]] = []
+
+    for det in detections:
+        score = 0.0
+        _, _, w, h = det.bbox
+        det_area = w * h
+
+        # Known watermark text is the strongest signal
+        if det.is_watermark_text:
+            score += 3.0
+
+        # Typical watermark position
+        if det.is_edge_position:
+            score += 1.5
+
+        # Watermarks are small relative to the image
+        if det_area < img_area * 0.15:
+            score += 0.5
+
+        # OCR confidence
+        score += det.confidence
+
+        scored.append((score, det))
+
+    # Sort by score descending
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    best_score, best = scored[0]
+
+    # Require minimum score to avoid false positives.
+    # Known watermark text (3.0) + any position easily clears this.
+    # Edge position (1.5) + high OCR conf (0.8) + small size (0.5) = 2.8 — marginal.
+    # We want to be conservative: a text in the corner that doesn't match
+    # any known pattern might be part of the actual content.
+    min_score = 2.5
+    if best_score < min_score:
+        logger.debug(
+            f"OCR: best candidate '{best.text}' scored {best_score:.1f} "
+            f"(below threshold {min_score})"
+        )
+        return None
+
+    return best
+
+
+def _best_clone_direction(
+    x: int, y: int, w: int, h: int, img_w: int, img_h: int
+) -> str:
+    """Determine the best direction to clone from based on watermark position."""
+    cx = x + w / 2
+    cy = y + h / 2
+
+    # Clone from the direction with the most space
+    distances = {
+        "above": cy,
+        "below": img_h - cy,
+        "left": cx,
+        "right": img_w - cx,
+    }
+    return max(distances, key=distances.get)
