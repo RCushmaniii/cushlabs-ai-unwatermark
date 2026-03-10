@@ -48,19 +48,20 @@ _WATERMARK_PATTERNS = [
     r"pixabay",
     r"freepik",
     r"envato",
-    r"made\s+with",
-    r"created\s+(?:with|by|in)",
-    r"powered\s+by",
-    r"generated\s+(?:with|by)",
-    r"sample",
-    r"preview",
-    r"watermark",
-    r"draft",
-    r"proof",
-    r"comp(?:osite)?(?:\s+image)?",
-    r"for\s+review\s+only",
-    r"not\s+for\s+(?:re)?sale",
-    r"copyright\s*\u00a9?",
+    r"made\s+with\b",
+    r"created\s+(?:with|by|in)\b",
+    r"powered\s+by\b",
+    r"generated\s+(?:with|by)\b",
+    r"\bsample\b",
+    r"\bpreview\b",
+    r"\bwatermark\b",
+    r"\bdraft\b",
+    r"\bproof\b",
+    r"\bcomposite\b",
+    r"\bcomp\s+image\b",
+    r"\bfor\s+review\s+only\b",
+    r"\bnot\s+for\s+(?:re)?sale\b",
+    r"\bcopyright\s*\u00a9?",
     r"\u00a9\s*\d{4}",
     r"www\.\w+\.\w+",
 ]
@@ -194,6 +195,13 @@ def _is_watermark_text(text: str, known_text: str | None = None) -> bool:
 
     # Very short text is usually noise
     if len(lower) < 2:
+        return False
+
+    # Long text is almost certainly content, not a watermark.
+    # Watermarks are typically 1-4 words. "© 2024 Getty Images" = 4 words.
+    # "Field research requires a compromise between speed and" = 9 words = content.
+    word_count = len(lower.split())
+    if word_count > 5:
         return False
 
     # Check user-provided hint first
