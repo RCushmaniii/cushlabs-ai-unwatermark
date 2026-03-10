@@ -75,14 +75,39 @@ async def analyze_file(
     region_w: int = Form(-1),
     region_h: int = Form(-1),
 ):
-    """Analyze an uploaded image for watermarks."""
+    """Analyze an uploaded file for watermarks."""
     content = await file.read()
-    image = Image.open(io.BytesIO(content))
+    suffix = Path(file.filename).suffix.lower() if file.filename else ""
+    is_image = suffix in {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}
 
     annotation = _build_annotation(
         description, region_x, region_y, region_w, region_h
     )
     config = load_config()
+
+    if not is_image:
+        # Documents (PDF, PPTX) can't be previewed as a single image.
+        # Return a default analysis — actual per-page analysis happens in /process.
+        return JSONResponse({
+            "watermark_found": True,
+            "region": {"x": 0, "y": 0, "width": 0, "height": 0},
+            "description": annotation.description if annotation else "Watermark",
+            "background_type": "mixed",
+            "strategy": "clone_stamp",
+            "confidence": 0.5,
+            "reasoning": (
+                "Document files are analyzed page-by-page during processing. "
+                "Click Remove Watermark to proceed."
+            ),
+        })
+
+    try:
+        image = Image.open(io.BytesIO(content))
+    except Exception:
+        return JSONResponse(
+            {"error": "Could not open file as an image. Check the file format."},
+            status_code=400,
+        )
 
     try:
         analysis = analyze_watermark(image, config, annotation)

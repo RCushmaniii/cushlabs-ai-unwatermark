@@ -12,7 +12,7 @@ def page(title: str, body: str, active_nav: str = "") -> str:
 <link rel="icon" href="/favicon.ico" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600;700&family=Lato:wght@300;400;700&display=swap"
   rel="stylesheet">
 <style>
 {BASE_CSS}
@@ -79,13 +79,16 @@ BASE_CSS = """
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg-secondary); color: var(--text-body);
   min-height: 100vh; display: flex; flex-direction: column;
   -webkit-font-smoothing: antialiased;
   font-weight: 400;
 }
-h1, h2, h3, h4 { color: var(--text-heading); font-weight: 600; letter-spacing: -0.02em; }
+h1, h2, h3, h4 {
+  font-family: 'Josefin Sans', 'Lato', sans-serif;
+  color: var(--text-heading); font-weight: 600; letter-spacing: 0.02em;
+}
 a { color: var(--accent-text); text-decoration: none; transition: color 0.15s; }
 a:hover { color: var(--accent-hover); }
 
@@ -100,9 +103,10 @@ a:hover { color: var(--accent-hover); }
   height: 52px;
 }
 .nav-brand {
+  font-family: 'Josefin Sans', sans-serif;
   font-size: 1rem; font-weight: 700; color: var(--text-heading);
   display: flex; align-items: center; gap: 0.5rem;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.02em;
 }
 .nav-brand:hover { color: var(--text-heading); }
 .nav-logo {
@@ -153,8 +157,8 @@ a:hover { color: var(--accent-hover); }
 
 /* Shared utilities */
 .page-title {
-  font-size: 1.5rem; font-weight: 700; color: var(--text-heading);
-  margin-bottom: 0.3rem;
+  font-size: 1.5rem; font-weight: 300; color: var(--text-heading);
+  margin-bottom: 0.3rem; letter-spacing: 0.04em;
 }
 .page-subtitle { color: var(--text-muted); font-size: 0.92rem; margin-bottom: 2rem; }
 .section { margin-bottom: 2.5rem; }
@@ -208,9 +212,10 @@ a:hover { color: var(--accent-hover); }
   border-bottom: 1px solid var(--border);
 }
 .step-indicator {
+  font-family: 'Josefin Sans', sans-serif;
   text-align: center; padding: 0.5rem 1.25rem;
-  font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.06em; color: var(--text-faint);
+  font-size: 0.72rem; font-weight: 400; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--text-faint);
   border-bottom: 2px solid transparent; transition: all 0.2s;
 }
 .step-indicator.active { color: var(--accent-text); border-bottom-color: var(--accent); }
