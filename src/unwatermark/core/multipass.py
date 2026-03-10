@@ -4,11 +4,14 @@ After removing a watermark, re-scans the image for additional watermarks.
 Handles cases like images with multiple overlapping watermarks (e.g., a
 stock photo with both a tiled "Shutterstock" pattern and a corner logo).
 
+Pass 1 uses the full detection stack (OCR → AI → heuristic).
+Pass 2+ uses OCR only to avoid expensive/slow AI calls for each re-scan.
 Caps at MAX_PASSES to prevent infinite loops.
 """
 
 from __future__ import annotations
 
+import gc
 import logging
 from dataclasses import dataclass
 
@@ -16,6 +19,7 @@ from PIL import Image
 
 from unwatermark.config import Config
 from unwatermark.core.detector import detect_watermark
+from unwatermark.core.ocr_detector import detect_watermark_ocr
 from unwatermark.core.remover import remove_watermark
 from unwatermark.models.analysis import WatermarkAnalysis
 from unwatermark.models.annotation import UserAnnotation
@@ -58,8 +62,23 @@ def clean_image(
     removed = 0
     first_analysis: WatermarkAnalysis | None = None
 
+    # Extract known_text hint for OCR from annotation
+    known_text = None
+    if annotation and annotation.has_description:
+        known_text = annotation.description
+
     for pass_num in range(1, MAX_PASSES + 1):
-        analysis = detect_watermark(current, config, annotation)
+        if pass_num == 1:
+            # Full detection stack: OCR → AI → heuristic
+            analysis = detect_watermark(current, config, annotation)
+        else:
+            # Subsequent passes: OCR only (fast, no API calls)
+            ocr_result = detect_watermark_ocr(current, known_text=known_text)
+            if ocr_result is not None:
+                analysis = ocr_result
+            else:
+                logger.info(f"Pass {pass_num}: no more text watermarks found — done")
+                break
 
         if not analysis.watermark_found:
             # If first pass finds nothing but we have a baseline, use it
@@ -82,6 +101,9 @@ def clean_image(
 
         current = remove_watermark(current, analysis, config, force_strategy)
         removed += 1
+
+        # Free memory between passes — LaMa and OCR are memory-hungry
+        gc.collect()
 
     if removed > 1:
         logger.info(f"Multi-pass complete: removed {removed} watermarks")
