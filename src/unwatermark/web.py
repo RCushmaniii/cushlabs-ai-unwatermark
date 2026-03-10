@@ -17,7 +17,7 @@ from PIL import Image
 
 from unwatermark.cli import _get_handler
 from unwatermark.config import load_config
-from unwatermark.core.analyzer import analyze_watermark
+from unwatermark.core.detector import detect_watermark
 from unwatermark.models.analysis import WatermarkRegion
 from unwatermark.models.annotation import UserAnnotation
 from unwatermark.pages import APP_PAGE, HELP_PAGE, NOT_FOUND_PAGE, PRIVACY_PAGE, TERMS_PAGE
@@ -101,7 +101,7 @@ async def analyze_file(
         preview_image = _extract_preview(content, suffix)
         if preview_image is not None:
             try:
-                analysis = analyze_watermark(preview_image, config, annotation)
+                analysis = detect_watermark(preview_image, config, annotation)
                 return JSONResponse({
                     "watermark_found": analysis.watermark_found,
                     "region": {
@@ -115,7 +115,7 @@ async def analyze_file(
                     "strategy": analysis.strategy.value,
                     "confidence": analysis.confidence,
                     "reasoning": (
-                        f"Analyzed first page preview. {analysis.reasoning} "
+                        f"{analysis.reasoning} "
                         "Each page will be analyzed independently during processing."
                     ),
                 })
@@ -146,7 +146,7 @@ async def analyze_file(
         )
 
     try:
-        analysis = analyze_watermark(image, config, annotation)
+        analysis = detect_watermark(image, config, annotation)
     except Exception as e:
         logger.exception("Analysis failed")
         return JSONResponse(
