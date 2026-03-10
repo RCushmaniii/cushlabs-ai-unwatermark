@@ -115,7 +115,7 @@ class LamaInpaintTechnique(RemovalTechnique):
         mask_bytes = self._image_to_bytes(mask, "PNG")
 
         output = client.run(
-            "andreasjansson/lama-cleaner:a]",
+            "twn39/lama",
             input={
                 "image": io.BytesIO(img_bytes),
                 "mask": io.BytesIO(mask_bytes),
