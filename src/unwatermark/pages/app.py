@@ -38,9 +38,14 @@ APP_PAGE = page("App", """
     </div>
     <div class="controls-panel">
       <div class="control-group">
-        <label class="control-label">Describe the watermark</label>
+        <label class="control-label">What does it look like?</label>
         <input type="text" class="control-input" id="descInputImage"
-          placeholder='e.g. "gray NotebookLM text, bottom-right"'>
+          placeholder='e.g. "gray NotebookLM text with icon"'>
+      </div>
+      <div class="control-group">
+        <label class="control-label">Where is it?</label>
+        <input type="text" class="control-input" id="locInputImage"
+          placeholder='e.g. "bottom-right corner"'>
       </div>
       <div class="btn-row">
         <button class="btn btn-secondary" id="btnBackImage">
@@ -85,9 +90,14 @@ APP_PAGE = page("App", """
     </div>
     <div class="describe-form">
       <div class="control-group">
-        <label class="control-label">Describe the watermark</label>
+        <label class="control-label">What does the watermark look like?</label>
         <input type="text" class="control-input" id="descInputDoc"
-          placeholder='e.g. "gray NotebookLM text, bottom-right corner"'>
+          placeholder='e.g. "gray NotebookLM text with icon"'>
+      </div>
+      <div class="control-group">
+        <label class="control-label">Where is it on the page?</label>
+        <input type="text" class="control-input" id="locInputDoc"
+          placeholder='e.g. "bottom-right corner"'>
         <p class="input-help">Each page will be analyzed and processed independently.</p>
       </div>
       <div class="describe-actions">
@@ -285,6 +295,26 @@ input[type="file"] { display: none; }
 }
 .before-tag { right: 8px; background: rgba(220,38,38,0.85); color: #fff; }
 .after-tag { left: 8px; background: rgba(5,150,105,0.85); color: #fff; }
+
+/* Progress bar */
+.progress-panel {
+  background: var(--bg-primary); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.25rem; margin-top: 0.85rem;
+}
+.progress-label {
+  font-size: 0.78rem; color: var(--text-body); margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+.progress-track {
+  height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%; background: var(--accent); border-radius: 3px;
+  transition: width 0.3s ease; width: 0%;
+}
+.progress-status {
+  font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem;
+}
 </style>
 
 <script>
@@ -316,6 +346,7 @@ const steps = {
 
 // Active desc/status/result elements depend on file type
 function getDescInput() { return isImageFile ? document.getElementById('descInputImage') : document.getElementById('descInputDoc'); }
+function getLocInput() { return isImageFile ? document.getElementById('locInputImage') : document.getElementById('locInputDoc'); }
 function getStatus() { return isImageFile ? document.getElementById('statusImage') : document.getElementById('statusDoc'); }
 function getAnalysisResult() { return isImageFile ? document.getElementById('analysisResultImage') : document.getElementById('analysisResultDoc'); }
 function getRemoveRow() { return isImageFile ? document.getElementById('removeRowImage') : document.getElementById('removeRowDoc'); }
@@ -519,6 +550,7 @@ async function doAnalyze() {
   const fd = new FormData();
   fd.append('file', uploadedFile);
   fd.append('description', getDescInput().value);
+  fd.append('location', getLocInput().value);
   if (drawnRect) {
     fd.append('region_x', drawnRect.x); fd.append('region_y', drawnRect.y);
     fd.append('region_w', drawnRect.w); fd.append('region_h', drawnRect.h);
@@ -580,17 +612,38 @@ function renderAnalysis(a) {
     </div>`;
 }
 
-// Remove — both layouts
+// Remove — both layouts (streaming progress)
 document.getElementById('btnRemoveImage').addEventListener('click', doRemove);
 document.getElementById('btnRemoveDoc').addEventListener('click', doRemove);
+
+function showProgress(message, pct) {
+  const container = getAnalysisResult();
+  let panel = container.querySelector('.progress-panel');
+  if (!panel) {
+    container.innerHTML =
+      '<div class="progress-panel">' +
+      '<div class="progress-label">Removing watermark</div>' +
+      '<div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>' +
+      '<div class="progress-status" id="progressStatus"></div>' +
+      '</div>';
+    panel = container.querySelector('.progress-panel');
+  }
+  const fill = document.getElementById('progressFill');
+  const status = document.getElementById('progressStatus');
+  if (fill) fill.style.width = pct + '%';
+  if (status) status.textContent = message;
+}
+
 async function doRemove() {
   const btn = isImageFile ? document.getElementById('btnRemoveImage') : document.getElementById('btnRemoveDoc');
   setLoading(btn, true);
   getStatus().className = 'status'; getStatus().textContent = '';
+  showProgress('Starting\u2026', 2);
 
   const fd = new FormData();
   fd.append('file', uploadedFile);
   fd.append('description', getDescInput().value);
+  fd.append('location', getLocInput().value);
   fd.append('strategy', getStrategySelect().value);
   if (drawnRect) {
     fd.append('region_x', drawnRect.x); fd.append('region_y', drawnRect.y);
@@ -602,7 +655,40 @@ async function doRemove() {
       const data = await resp.json().catch(() => null);
       throw new Error(data?.error || 'Processing failed. Please try again.');
     }
-    cleanBlob = await resp.blob();
+
+    // Read the NDJSON stream line by line
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let downloadToken = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const evt = JSON.parse(line);
+        if (evt.type === 'progress') {
+          showProgress(evt.message, evt.pct);
+        } else if (evt.type === 'complete') {
+          downloadToken = evt.download_token;
+          showProgress('Done', 100);
+        } else if (evt.type === 'error') {
+          throw new Error(evt.message);
+        }
+      }
+    }
+
+    if (!downloadToken) throw new Error('Processing completed but no download available.');
+
+    // Download the result
+    showProgress('Downloading result\u2026', 100);
+    const dlResp = await fetch('/download/' + downloadToken);
+    if (!dlResp.ok) throw new Error('Download failed.');
+    cleanBlob = await dlResp.blob();
     showCompare();
   } catch (err) {
     getStatus().className = 'status error';
@@ -670,7 +756,9 @@ document.getElementById('btnRestart').addEventListener('click', () => {
   isImageFile = false;
   fileInput.value = '';
   document.getElementById('descInputImage').value = '';
+  document.getElementById('locInputImage').value = '';
   document.getElementById('descInputDoc').value = '';
+  document.getElementById('locInputDoc').value = '';
   document.getElementById('analysisResultImage').innerHTML = '';
   document.getElementById('analysisResultDoc').innerHTML = '';
   document.getElementById('removeRowImage').style.display = 'none';

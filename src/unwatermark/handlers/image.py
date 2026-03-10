@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Callable
 
 from PIL import Image
 
@@ -18,6 +19,7 @@ def process_image(
     config: Config,
     annotation: UserAnnotation | None = None,
     force_strategy: str | None = None,
+    on_progress: Callable[[str, int], None] | None = None,
 ) -> Path:
     """Remove watermark from a single image file.
 
@@ -27,17 +29,31 @@ def process_image(
         config: Runtime configuration.
         annotation: Optional user hints about the watermark.
         force_strategy: Override the AI's strategy recommendation.
+        on_progress: Callback(message, percent) for progress updates.
 
     Returns:
         Path to the output file.
     """
+    if on_progress:
+        on_progress("Analyzing image for watermarks\u2026", 10)
+
     image = Image.open(input_path)
     analysis = detect_watermark(image, config, annotation)
+
+    if on_progress:
+        on_progress("Removing watermark\u2026", 50)
+
     cleaned = remove_watermark(image, analysis, config, force_strategy)
 
-    # Convert back to RGB if saving as JPEG
     if output_path.suffix.lower() in (".jpg", ".jpeg"):
         cleaned = cleaned.convert("RGB")
 
+    if on_progress:
+        on_progress("Saving cleaned image\u2026", 90)
+
     cleaned.save(output_path, quality=95)
+
+    if on_progress:
+        on_progress("Done", 100)
+
     return output_path

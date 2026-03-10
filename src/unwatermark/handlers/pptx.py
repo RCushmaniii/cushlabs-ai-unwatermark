@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+from typing import Callable
 
 from PIL import Image
 from pptx import Presentation
@@ -24,11 +25,9 @@ def process_pptx(
     config: Config,
     annotation: UserAnnotation | None = None,
     force_strategy: str | None = None,
+    on_progress: Callable[[str, int], None] | None = None,
 ) -> Path:
     """Remove watermarks from all images embedded in a PPTX file.
-
-    Each slide image is analyzed independently — different slides may get
-    different removal strategies based on their background content.
 
     Args:
         input_path: Path to the source PPTX.
@@ -36,6 +35,7 @@ def process_pptx(
         config: Runtime configuration.
         annotation: Optional user hints about the watermark.
         force_strategy: Override the AI's strategy recommendation.
+        on_progress: Callback(message, percent) for progress updates.
 
     Returns:
         Path to the output file.
@@ -44,13 +44,21 @@ def process_pptx(
 
     prs = Presentation(str(input_path))
 
-    if len(prs.slides) > MAX_SLIDES:
+    slide_count = len(prs.slides)
+    if slide_count > MAX_SLIDES:
         raise ValueError(
-            f"PPTX has {len(prs.slides)} slides (max {MAX_SLIDES}). "
+            f"PPTX has {slide_count} slides (max {MAX_SLIDES}). "
             f"Split the file or use the CLI for larger presentations."
         )
 
-    for slide in prs.slides:
+    for slide_idx, slide in enumerate(prs.slides):
+        pct = int(5 + (slide_idx / slide_count) * 90)
+        if on_progress:
+            on_progress(
+                f"Processing slide {slide_idx + 1} of {slide_count}\u2026",
+                pct,
+            )
+
         for shape in slide.shapes:
             if not shape.shape_type or not hasattr(shape, "image"):
                 continue
@@ -77,7 +85,14 @@ def process_pptx(
 
             image_part._blob = buf.getvalue()
 
+    if on_progress:
+        on_progress("Saving presentation\u2026", 95)
+
     prs.save(str(output_path))
+
+    if on_progress:
+        on_progress("Done", 100)
+
     return output_path
 
 

@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
 import tempfile
+import threading
+import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.exceptions import HTTPException
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from PIL import Image
 
 from unwatermark.cli import _get_handler
@@ -23,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Unwatermark", description="AI-powered watermark removal")
 
-# Inline SVG favicon — indigo "U" on transparent background
+# Inline SVG favicon
 FAVICON_SVG = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
     '<rect width="32" height="32" rx="4" fill="#0047ab"/>'
@@ -31,6 +34,10 @@ FAVICON_SVG = (
     'font-family="Inter,system-ui,sans-serif" font-weight="700" '
     'font-size="22" fill="#fff">U</text></svg>'
 )
+
+# In-memory store for completed downloads (token → file path)
+_downloads: dict[str, Path] = {}
+_download_names: dict[str, str] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +77,7 @@ async def favicon():
 async def analyze_file(
     file: UploadFile = File(...),
     description: str = Form(""),
+    location: str = Form(""),
     region_x: int = Form(-1),
     region_y: int = Form(-1),
     region_w: int = Form(-1),
@@ -80,18 +88,19 @@ async def analyze_file(
     suffix = Path(file.filename).suffix.lower() if file.filename else ""
     is_image = suffix in {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}
 
+    # Combine description + location into a single annotation string
+    combined_desc = _combine_description(description, location)
+
     annotation = _build_annotation(
-        description, region_x, region_y, region_w, region_h
+        combined_desc, region_x, region_y, region_w, region_h
     )
     config = load_config()
 
     if not is_image:
-        # Documents (PDF, PPTX) can't be previewed as a single image.
-        # Return a default analysis — actual per-page analysis happens in /process.
         return JSONResponse({
             "watermark_found": True,
             "region": {"x": 0, "y": 0, "width": 0, "height": 0},
-            "description": annotation.description if annotation else "Watermark",
+            "description": combined_desc or "Watermark",
             "background_type": "mixed",
             "strategy": "clone_stamp",
             "confidence": 0.5,
@@ -137,13 +146,20 @@ async def analyze_file(
 async def process_file(
     file: UploadFile = File(...),
     description: str = Form(""),
+    location: str = Form(""),
     strategy: str = Form(""),
     region_x: int = Form(-1),
     region_y: int = Form(-1),
     region_w: int = Form(-1),
     region_h: int = Form(-1),
 ):
-    """Process an uploaded file — detect and remove watermark."""
+    """Process with streaming progress — returns newline-delimited JSON events.
+
+    Each line is a JSON object:
+      {"type": "progress", "message": "...", "pct": 50}
+      {"type": "complete", "download_token": "abc123"}
+      {"type": "error", "message": "..."}
+    """
     suffix = Path(file.filename).suffix.lower()
     handler = _get_handler(suffix)
     if handler is None:
@@ -158,25 +174,72 @@ async def process_file(
         tmp_in.flush()
         input_path = Path(tmp_in.name)
 
+    combined_desc = _combine_description(description, location)
     annotation = _build_annotation(
-        description, region_x, region_y, region_w, region_h
+        combined_desc, region_x, region_y, region_w, region_h
     )
     config = load_config()
     force_strategy = strategy if strategy else None
     output_path = input_path.with_stem(input_path.stem + "_clean")
+    original_filename = file.filename or "file"
 
-    try:
-        handler(input_path, output_path, config, annotation, force_strategy)
-    except Exception as e:
-        logger.exception("Processing failed")
-        return JSONResponse(
-            {"error": _friendly_error(e)}, status_code=500
-        )
+    # Progress state shared between the processing thread and the generator
+    progress_events: list[dict] = []
+    done_event = threading.Event()
+    error_holder: list[str] = []
 
+    def on_progress(message: str, pct: int) -> None:
+        progress_events.append({"type": "progress", "message": message, "pct": pct})
+
+    def run_handler() -> None:
+        try:
+            handler(
+                input_path, output_path, config, annotation, force_strategy,
+                on_progress=on_progress,
+            )
+        except Exception as e:
+            logger.exception("Processing failed")
+            error_holder.append(_friendly_error(e))
+        finally:
+            done_event.set()
+
+    # Run the handler in a thread so we can stream progress
+    thread = threading.Thread(target=run_handler, daemon=True)
+    thread.start()
+
+    def event_stream():
+        sent = 0
+        while not done_event.is_set():
+            done_event.wait(timeout=0.3)
+            while sent < len(progress_events):
+                yield json.dumps(progress_events[sent]) + "\n"
+                sent += 1
+
+        # Flush remaining
+        while sent < len(progress_events):
+            yield json.dumps(progress_events[sent]) + "\n"
+            sent += 1
+
+        if error_holder:
+            yield json.dumps({"type": "error", "message": error_holder[0]}) + "\n"
+        else:
+            token = str(uuid.uuid4())[:8]
+            _downloads[token] = output_path
+            _download_names[token] = f"clean_{original_filename}"
+            yield json.dumps({"type": "complete", "download_token": token}) + "\n"
+
+    return StreamingResponse(event_stream(), media_type="application/x-ndjson")
+
+
+@app.get("/download/{token}")
+async def download_file(token: str):
+    """Download a processed file by token."""
+    path = _downloads.pop(token, None)
+    name = _download_names.pop(token, "clean_file")
+    if path is None or not path.exists():
+        return JSONResponse({"error": "Download expired or not found."}, status_code=404)
     return FileResponse(
-        path=str(output_path),
-        filename=f"clean_{file.filename}",
-        media_type="application/octet-stream",
+        path=str(path), filename=name, media_type="application/octet-stream"
     )
 
 
@@ -192,6 +255,16 @@ async def not_found_handler(request: Request, exc: HTTPException):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _combine_description(description: str, location: str) -> str:
+    """Merge 'what it looks like' and 'where it is' into a single string."""
+    parts = []
+    if description.strip():
+        parts.append(description.strip())
+    if location.strip():
+        parts.append(location.strip())
+    return ", ".join(parts)
+
 
 def _build_annotation(
     description: str,

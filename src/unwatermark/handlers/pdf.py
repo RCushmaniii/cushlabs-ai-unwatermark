@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+from typing import Callable
 
 import fitz  # PyMuPDF
 from PIL import Image
@@ -21,10 +22,9 @@ def process_pdf(
     annotation: UserAnnotation | None = None,
     force_strategy: str | None = None,
     dpi: int = 200,
+    on_progress: Callable[[str, int], None] | None = None,
 ) -> Path:
     """Remove watermarks from a PDF by rendering pages, cleaning, and reassembling.
-
-    Each page is analyzed independently for optimal per-page strategy selection.
 
     Args:
         input_path: Path to the source PDF.
@@ -33,6 +33,7 @@ def process_pdf(
         annotation: Optional user hints about the watermark.
         force_strategy: Override the AI's strategy recommendation.
         dpi: Resolution for rendering PDF pages to images.
+        on_progress: Callback(message, percent) for progress updates.
 
     Returns:
         Path to the output file.
@@ -54,6 +55,12 @@ def process_pdf(
     matrix = fitz.Matrix(zoom, zoom)
 
     for page_idx in range(page_count):
+        pct = int(5 + (page_idx / page_count) * 90)
+        if on_progress:
+            on_progress(
+                f"Processing page {page_idx + 1} of {page_count}\u2026", pct
+            )
+
         page = src_doc[page_idx]
         pix = page.get_pixmap(matrix=matrix)
 
@@ -73,8 +80,14 @@ def process_pdf(
         out_page.insert_image(rect, stream=img_doc.tobytes())
         img_doc.close()
 
+    if on_progress:
+        on_progress("Assembling PDF\u2026", 95)
+
     out_doc.save(str(output_path))
     out_doc.close()
     src_doc.close()
+
+    if on_progress:
+        on_progress("Done", 100)
 
     return output_path
