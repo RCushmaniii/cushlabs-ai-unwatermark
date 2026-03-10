@@ -44,11 +44,11 @@ HELP_PAGE = page("Help", """
     </div>
   </div>
   <div class="card">
-    <h3 style="color:var(--text-heading);font-size:0.92rem;margin-bottom:0.5rem;">Step 3 — Compare &amp; Download</h3>
+    <h3 style="color:var(--text-heading);font-size:0.92rem;margin-bottom:0.5rem;">Step 3 — Result</h3>
     <div class="prose">
-      <p>After removal, a before/after slider lets you drag left and right to compare the original and cleaned versions. If the result isn't perfect:</p>
+      <p>For images, a before/after slider lets you drag left and right to compare the original and cleaned versions. For documents, you'll see a success screen with your clean file ready to download.</p>
       <ul>
-        <li>Click <strong>Try Different Strategy</strong> to go back and select a different removal technique.</li>
+        <li>Click <strong>Try Again</strong> to go back and adjust your description or annotations.</li>
         <li>Click <strong>Start Over</strong> to upload a new file.</li>
       </ul>
       <p>When you're happy, click <strong>Download Clean File</strong>.</p>
@@ -57,9 +57,9 @@ HELP_PAGE = page("Help", """
 </div>
 
 <div class="section">
-  <h2 class="section-title">Removal Strategies</h2>
+  <h2 class="section-title">Removal Techniques</h2>
   <div class="prose">
-    <p>The AI automatically selects the best strategy, but you can override it:</p>
+    <p>The AI automatically selects the best technique for each watermark based on the background:</p>
   </div>
   <div class="card">
     <div class="prose">
@@ -92,9 +92,9 @@ unwatermark photo.jpg --strategy solid_fill --no-ai</div>
   <div class="card">
     <div class="prose">
       <ul>
-        <li><strong>Draw a tight rectangle</strong> — The closer your selection fits the actual watermark, the cleaner the removal. Don't include too much surrounding content.</li>
-        <li><strong>Describe what you see</strong> — Even a short description like "semi-transparent logo" helps the AI understand the watermark type.</li>
-        <li><strong>Try multiple strategies</strong> — If Solid Fill leaves an artifact, try Clone Stamp. If Clone Stamp looks unnatural, try Inpaint.</li>
+        <li><strong>Draw a tight rectangle</strong> — For images, the closer your selection fits the actual watermark, the cleaner the removal. Don't include too much surrounding content.</li>
+        <li><strong>Describe both what and where</strong> — Use both fields: "What does it look like?" (e.g., "gray NotebookLM text with icon") and "Where is it?" (e.g., "bottom-right corner, white on dark backgrounds"). The more detail you give, the better the AI performs.</li>
+        <li><strong>Mention color variations</strong> — If the watermark changes color depending on the background (e.g., "white on dark slides, gray on light slides"), mention that. The AI uses this to find it on every page.</li>
         <li><strong>Use high-res source files</strong> — Higher resolution images give all techniques more surrounding context to work with.</li>
       </ul>
     </div>
@@ -109,8 +109,8 @@ unwatermark photo.jpg --strategy solid_fill --no-ai</div>
       <p>Your image is sent to Claude's API for analysis only (to detect the watermark). The actual removal happens entirely on the server — no image data is stored after processing.</p>
       <p><strong>What about PDFs and PPTX files?</strong></p>
       <p>PDFs are rendered to high-resolution images, cleaned, and reassembled. PPTX files have their embedded images processed in-place — all slide layout, text, and formatting is preserved.</p>
-      <p><strong>Why is LaMa Inpaint not available?</strong></p>
-      <p>LaMa requires a separate installation (<code>pip install simple-lama-inpainting</code>) because it pulls in PyTorch (~2 GB). If LaMa isn't installed, the system automatically falls back to Clone Stamp.</p>
+      <p><strong>How does the AI decide which technique to use?</strong></p>
+      <p>Claude's vision model examines the background behind the watermark. Solid backgrounds get a color fill, gradients get interpolated fills, and complex backgrounds (photos, text, diagrams) use LaMa neural inpainting for the best results.</p>
     </div>
   </div>
 </div>
