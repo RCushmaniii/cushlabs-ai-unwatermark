@@ -67,15 +67,16 @@ def process_pptx(
                 continue
 
             try:
-                image_part = shape.image
+                image_wrapper = shape.image
             except Exception:
                 continue
 
-            image_bytes = image_part.blob
+            image_bytes = image_wrapper.blob
+            content_type = image_wrapper.content_type
             image = Image.open(io.BytesIO(image_bytes))
             logger.info(
                 f"Slide {slide_idx + 1}: found image {image.width}x{image.height} "
-                f"({image_part.content_type})"
+                f"({content_type})"
             )
 
             analysis = detect_watermark(image, config, annotation)
@@ -89,12 +90,23 @@ def process_pptx(
             cleaned = remove_watermark(image, analysis, config, force_strategy)
 
             buf = io.BytesIO()
-            img_format = _content_type_to_format(image_part.content_type)
+            img_format = _content_type_to_format(content_type)
             if img_format == "JPEG":
                 cleaned = cleaned.convert("RGB")
             cleaned.save(buf, format=img_format, quality=95)
 
-            image_part._blob = buf.getvalue()
+            # CRITICAL: shape.image returns a wrapper object — setting _blob on it
+            # does NOT persist. We must update the actual ImagePart in the package
+            # by navigating through the slide's relationship to the embedded image.
+            actual_part = _get_image_part(shape, slide)
+            if actual_part is not None:
+                new_blob = buf.getvalue()
+                actual_part._blob = new_blob
+                logger.info(
+                    f"Slide {slide_idx + 1}: replaced blob ({len(new_blob)} bytes)"
+                )
+            else:
+                logger.warning(f"Slide {slide_idx + 1}: image part not found")
 
     if on_progress:
         on_progress("Saving presentation\u2026", 95)
@@ -105,6 +117,28 @@ def process_pptx(
         on_progress("Done", 100)
 
     return output_path
+
+
+def _get_image_part(shape, slide):
+    """Get the actual ImagePart from the PPTX package for a picture shape.
+
+    shape.image returns a read-only wrapper — to persist changes, we need
+    the real ImagePart stored in the slide's relationships.
+    """
+    try:
+        pic = shape._element
+        ns_r = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+        ns_a = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        blips = pic.findall(f".//{ns_a}blip")
+        if not blips:
+            return None
+        r_embed = blips[0].get(f"{ns_r}embed")
+        if not r_embed:
+            return None
+        return slide.part.related_part(r_embed)
+    except Exception as e:
+        logger.warning(f"Failed to resolve image part: {e}")
+        return None
 
 
 def _content_type_to_format(content_type: str) -> str:
