@@ -97,7 +97,7 @@ def _try_grounding(
         # First, get a detailed caption
         logger.info("Florence-2: getting image caption...")
         caption_output = client.run(
-            "lucataco/florence-2-large",
+            "lucataco/florence-2-large:da53547e17d45b9cfb48174b2f18af8b83ca020fa76db62136bf9c6616762595",
             input={
                 "image": img_uri,
                 "task_input": "More Detailed Caption",
@@ -124,7 +124,7 @@ def _try_grounding(
         ground_text = custom_prompt or "watermark"
         logger.info(f"Florence-2: grounding '{ground_text}'...")
         ground_output = client.run(
-            "lucataco/florence-2-large",
+            "lucataco/florence-2-large:da53547e17d45b9cfb48174b2f18af8b83ca020fa76db62136bf9c6616762595",
             input={
                 "image": img_uri,
                 "task_input": "Caption to Phrase Grounding",
@@ -147,7 +147,7 @@ def _try_ocr_with_region(
     try:
         logger.info("Florence-2: running OCR with region...")
         ocr_output = client.run(
-            "lucataco/florence-2-large",
+            "lucataco/florence-2-large:da53547e17d45b9cfb48174b2f18af8b83ca020fa76db62136bf9c6616762595",
             input={
                 "image": img_uri,
                 "task_input": "OCR with Region",
@@ -170,18 +170,41 @@ def _image_to_data_uri(image: Image.Image) -> str:
 
 
 def _extract_text(output) -> str:
-    """Extract text from Replicate output (may be string, iterator, etc)."""
+    """Extract text from Replicate output (may be string, dict, iterator, etc)."""
     if isinstance(output, str):
         return output
     if isinstance(output, dict):
-        # Look for text in common keys
-        for key in ["caption", "text", "result"]:
+        # Replicate Florence-2 returns {'img': None, 'text': "..."}
+        if "text" in output:
+            return str(output["text"])
+        for key in ["caption", "result"]:
             if key in output:
                 return str(output[key])
         return str(output)
     if hasattr(output, '__iter__'):
         return "".join(str(p) for p in output)
     return str(output)
+
+
+def _parse_florence_dict(text: str) -> dict | None:
+    """Parse Florence-2's text output which is a Python dict repr, not JSON.
+
+    Florence returns strings like: "{'<OCR_WITH_REGION>': {'quad_boxes': [...], 'labels': [...]}}"
+    This is a Python literal, not valid JSON (uses single quotes).
+    """
+    import ast
+    try:
+        return ast.literal_eval(text)
+    except (ValueError, SyntaxError):
+        pass
+
+    # Try JSON as fallback
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    return None
 
 
 def _parse_grounding_output(
@@ -192,10 +215,10 @@ def _parse_grounding_output(
     if not text:
         return None
 
-    # Try to parse as JSON
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
+    # Try to parse as dict (Florence returns Python repr, not JSON)
+    data = _parse_florence_dict(text)
+
+    if data is None:
         # Florence grounding output may contain bbox coordinates in text format
         # Try to extract bounding boxes from text like "<loc_123><loc_456>..."
         return _parse_loc_tags(text, img_w, img_h, max_bbox_percent, label)
@@ -220,11 +243,7 @@ def _parse_ocr_output(
     if not text:
         return None
 
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-
+    data = _parse_florence_dict(text)
     if not isinstance(data, dict):
         return None
 
