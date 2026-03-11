@@ -78,7 +78,7 @@ def load_config(**overrides) -> Config:
     config = Config(
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", ""),
         openai_api_key=os.getenv("OPENAI_API_KEY", ""),
-        replicate_api_token=os.getenv("REPLICATE_API_TOKEN", ""),
+        replicate_api_token=os.getenv("REPLICATE_API_TOKEN", "") or os.getenv("REPLICATE_API", ""),
         analysis_provider=AnalysisProvider(
             os.getenv("UNWATERMARK_ANALYSIS_PROVIDER", "claude")
         ),
