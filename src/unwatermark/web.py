@@ -20,19 +20,30 @@ from unwatermark.config import load_config
 from unwatermark.core.detector import detect_watermark
 from unwatermark.models.analysis import WatermarkRegion
 from unwatermark.models.annotation import UserAnnotation
-from unwatermark.pages import APP_PAGE, HELP_PAGE, NOT_FOUND_PAGE, PRIVACY_PAGE, TERMS_PAGE
+from unwatermark.pages import (
+    APP_PAGE,
+    CONTACT_PAGE,
+    HELP_PAGE,
+    LANDING_PAGE,
+    NOT_FOUND_PAGE,
+    PRIVACY_PAGE,
+    TERMS_PAGE,
+)
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Unwatermark", description="AI-powered watermark removal")
 
-# Inline SVG favicon
+# Inline SVG favicon — eye-off icon matching the brand
 FAVICON_SVG = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
-    '<rect width="32" height="32" rx="4" fill="#0047ab"/>'
-    '<text x="16" y="24" text-anchor="middle" '
-    'font-family="Inter,system-ui,sans-serif" font-weight="700" '
-    'font-size="22" fill="#fff">U</text></svg>'
+    '<rect width="32" height="32" rx="6" fill="#2563eb"/>'
+    '<g transform="translate(4,4)" stroke="#fff" stroke-width="1.8" '
+    'stroke-linecap="round" fill="none">'
+    '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"/>'
+    '<circle cx="12" cy="12" r="3"/>'
+    '<line x1="2" y1="2" x2="22" y2="22"/>'
+    '</g></svg>'
 )
 
 # Download token store — persists to disk so tokens survive server reloads
@@ -46,12 +57,22 @@ _DOWNLOAD_DIR.mkdir(exist_ok=True)
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
+    return LANDING_PAGE
+
+
+@app.get("/app", response_class=HTMLResponse)
+async def app_page():
     return APP_PAGE
 
 
 @app.get("/help", response_class=HTMLResponse)
 async def help_page():
     return HELP_PAGE
+
+
+@app.get("/contact", response_class=HTMLResponse)
+async def contact_page():
+    return CONTACT_PAGE
 
 
 @app.get("/terms", response_class=HTMLResponse)
