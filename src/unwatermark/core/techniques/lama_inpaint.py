@@ -103,6 +103,11 @@ class LamaInpaintTechnique(RemovalTechnique):
         Semi-transparent watermark text creates detectable local deviations even
         when the watermark and background have similar overall color properties.
 
+        Critical: excludes dark pixels (content text like headings) from the mask.
+        Watermarks are semi-transparent overlays — always lighter than solid content
+        text. Without this, dark content letters overlapping the watermark bbox
+        get flagged and damaged by inpainting.
+
         Returns a 2D uint8 array (region-sized) with 255 for watermark pixels
         and 0 for content pixels, or None if refinement isn't confident.
         """
@@ -142,6 +147,22 @@ class LamaInpaintTechnique(RemovalTechnique):
             mask_bool = binary_opening(mask_bool, structure=struct, iterations=1)
             mask_bool = binary_closing(mask_bool, structure=struct, iterations=2)
             mask_bool = binary_dilation(mask_bool, structure=struct, iterations=3)
+
+            # PROTECT DARK CONTENT TEXT (applied AFTER dilation so dilation
+            # can't expand the mask back over protected pixels):
+            # Watermarks are semi-transparent overlays — always lighter than
+            # solid content text (headings, body text). Pixels darker than the
+            # threshold are content, not watermark. This prevents the "D" in
+            # "Document" from being damaged when "DRAFT" watermark overlaps it.
+            dark_pixel_threshold = 120  # below this = solid content text
+            is_dark_content = pixels < dark_pixel_threshold
+            protected_count = np.sum(mask_bool & is_dark_content)
+            mask_bool = mask_bool & ~is_dark_content
+            if protected_count > 0:
+                logger.info(
+                    f"Dark-pixel protection: preserved {protected_count} content pixels "
+                    f"from inpainting mask"
+                )
 
             coverage = np.sum(mask_bool) / mask_bool.size
             if coverage < 0.01 or coverage > 0.85:
