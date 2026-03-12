@@ -148,20 +148,27 @@ class LamaInpaintTechnique(RemovalTechnique):
             mask_bool = binary_closing(mask_bool, structure=struct, iterations=2)
             mask_bool = binary_dilation(mask_bool, structure=struct, iterations=3)
 
-            # PROTECT DARK CONTENT TEXT (applied AFTER dilation so dilation
-            # can't expand the mask back over protected pixels):
-            # Watermarks are semi-transparent overlays — always lighter than
-            # solid content text (headings, body text). Pixels darker than the
-            # threshold are content, not watermark. This prevents the "D" in
-            # "Document" from being damaged when "DRAFT" watermark overlaps it.
-            dark_pixel_threshold = 120  # below this = solid content text
+            # PROTECT DARK CONTENT TEXT — but only when the region actually
+            # contains significant dark content (e.g., a heading overlapping the
+            # watermark bbox). If only a small % of the region is dark, those
+            # dark pixels ARE the watermark (like NotebookLM text on beige
+            # background), not content to protect.
+            dark_pixel_threshold = 120
             is_dark_content = pixels < dark_pixel_threshold
-            protected_count = np.sum(mask_bool & is_dark_content)
-            mask_bool = mask_bool & ~is_dark_content
-            if protected_count > 0:
-                logger.info(
-                    f"Dark-pixel protection: preserved {protected_count} content pixels "
-                    f"from inpainting mask"
+            dark_ratio = np.sum(is_dark_content) / pixels.size
+            if dark_ratio > 0.15:
+                # Significant dark content in region — protect it
+                protected_count = np.sum(mask_bool & is_dark_content)
+                mask_bool = mask_bool & ~is_dark_content
+                if protected_count > 0:
+                    logger.info(
+                        f"Dark-pixel protection ON ({dark_ratio:.0%} dark): "
+                        f"preserved {protected_count} content pixels"
+                    )
+            else:
+                logger.debug(
+                    f"Dark-pixel protection OFF ({dark_ratio:.0%} dark): "
+                    f"dark pixels are likely the watermark itself"
                 )
 
             coverage = np.sum(mask_bool) / mask_bool.size
