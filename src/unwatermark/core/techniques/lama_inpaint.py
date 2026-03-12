@@ -46,8 +46,16 @@ class LamaInpaintTechnique(RemovalTechnique):
         region: WatermarkRegion,
         analysis: WatermarkAnalysis,
     ) -> Image.Image:
-        # Build binary mask: white = area to inpaint, black = keep
-        mask = self._build_mask(image.size, region)
+        # Use pixel-perfect SAM mask when available, otherwise build smart mask
+        if analysis.mask is not None:
+            mask = analysis.mask.convert("L")
+            # Ensure mask matches image size
+            if mask.size != image.size:
+                mask = mask.resize(image.size, Image.NEAREST)
+            logger.info("Using SAM pixel-perfect mask for inpainting")
+        else:
+            # Try threshold-based refinement to avoid eating into adjacent content
+            mask = self._build_mask(image.size, region, image=image)
 
         if self._backend == "local":
             return self._run_local(image, mask)
@@ -59,15 +67,85 @@ class LamaInpaintTechnique(RemovalTechnique):
             raise ValueError(f"Unknown inpaint backend: {self._backend}")
 
     def _build_mask(
-        self, image_size: tuple[int, int], region: WatermarkRegion
+        self, image_size: tuple[int, int], region: WatermarkRegion,
+        image: Image.Image | None = None,
     ) -> Image.Image:
-        """Create a binary mask — white where the watermark is, black everywhere else."""
+        """Create a binary mask — white where the watermark is, black everywhere else.
+
+        When the source image is provided, attempts to refine the mask within the
+        bounding box by detecting semi-transparent watermark pixels. This prevents
+        the mask from eating into adjacent content (e.g., clipping letters near
+        the watermark boundary).
+        """
         w, h = image_size
         mask = Image.new("L", (w, h), 0)
-        # Draw white rectangle over the watermark region
         mask_arr = np.array(mask)
+
+        if image is not None:
+            refined = self._refine_mask_in_region(image, region)
+            if refined is not None:
+                mask_arr[region.y : region.y2, region.x : region.x2] = refined
+                logger.info("Using refined mask (threshold-based) for inpainting")
+                return Image.fromarray(mask_arr, mode="L")
+
+        # Fallback: simple rectangle
         mask_arr[region.y : region.y2, region.x : region.x2] = 255
         return Image.fromarray(mask_arr, mode="L")
+
+    @staticmethod
+    def _refine_mask_in_region(
+        image: Image.Image, region: WatermarkRegion
+    ) -> np.ndarray | None:
+        """Try to isolate watermark pixels within the bounding box.
+
+        Semi-transparent watermarks are typically lighter/more washed out than
+        the content beneath them. This method detects pixels in the region that
+        have low saturation and high lightness (typical of gray/white watermarks)
+        relative to the surrounding area.
+
+        Returns a 2D uint8 array (region-sized) with 255 for watermark pixels
+        and 0 for content pixels, or None if refinement isn't confident.
+        """
+        try:
+            # Crop the region
+            crop = image.crop((region.x, region.y, region.x2, region.y2))
+            crop_arr = np.array(crop.convert("RGB"), dtype=np.float32)
+
+            if crop_arr.size == 0:
+                return None
+
+            # Calculate per-pixel saturation: low saturation = grayish (watermark-like)
+            r, g, b = crop_arr[:, :, 0], crop_arr[:, :, 1], crop_arr[:, :, 2]
+            max_c = np.maximum(np.maximum(r, g), b)
+            min_c = np.minimum(np.minimum(r, g), b)
+            range_c = max_c - min_c
+            lightness = (max_c + min_c) / 2.0
+
+            # Watermark pixels tend to be low-saturation and mid-to-high lightness
+            # compared to content which is either very dark (text) or colorful (photos)
+            is_low_saturation = range_c < 40  # gray-ish
+            is_mid_light = lightness > 100  # not too dark
+
+            # Also check: watermark pixels are usually within a narrow brightness band
+            # (semi-transparent overlay makes nearby pixels similar brightness)
+            watermark_mask = is_low_saturation & is_mid_light
+
+            # If the mask covers less than 5% or more than 90% of the region,
+            # the refinement probably isn't useful — fall back to rectangle
+            coverage = np.sum(watermark_mask) / watermark_mask.size
+            if coverage < 0.05 or coverage > 0.90:
+                return None
+
+            # Dilate the mask slightly to ensure we catch watermark edges
+            from PIL import ImageFilter
+            mask_img = Image.fromarray((watermark_mask * 255).astype(np.uint8), mode="L")
+            mask_img = mask_img.filter(ImageFilter.MaxFilter(5))
+
+            return np.array(mask_img)
+
+        except Exception as e:
+            logger.debug(f"Mask refinement failed: {e}")
+            return None
 
     # -------------------------------------------------------------------------
     # Backend: Local (simple-lama-inpainting)

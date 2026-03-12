@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from PIL import Image
 
 
 class BackgroundType(str, Enum):
@@ -93,3 +97,4 @@ class WatermarkAnalysis:
     reasoning: str = ""
     context: SurroundingContext = field(default_factory=SurroundingContext)
     clone_direction: str = "above"
+    mask: Image.Image | None = None  # Pixel-perfect mask from SAM (white=watermark, black=keep)

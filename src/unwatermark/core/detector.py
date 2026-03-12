@@ -3,7 +3,7 @@
 Detection priority:
 1. OCR detection (deterministic, fast, local) — catches text watermarks
 2. Florence-2 via Replicate (~$0.001/call) — catches logos, visual watermarks
-3. Claude/GPT-4o Vision (fallback) — if no Replicate token available
+3. Claude/GPT-4o Vision (fallback) — expensive, non-deterministic
 4. Heuristic fallback — when no AI is available
 """
 
@@ -75,7 +75,6 @@ def detect_watermark(
     # Layer 2: Florence-2 via Replicate (cheap, fast, handles visual watermarks)
     if config.has_replicate_token:
         try:
-            # Build a detection prompt from user annotation if available
             detection_prompt = None
             if annotation and annotation.has_description:
                 detection_prompt = annotation.description
