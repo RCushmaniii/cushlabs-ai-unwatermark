@@ -423,16 +423,6 @@ input[type="file"] { display: none; }
     </div>
     <div class="controls-panel">
       <div class="controls-card">
-        <div class="control-group">
-          <label class="control-label">What does it look like?</label>
-          <input type="text" class="control-input" id="descInputImage"
-            placeholder='e.g. "gray NotebookLM text with icon"'>
-        </div>
-        <div class="control-group">
-          <label class="control-label">Where is it?</label>
-          <input type="text" class="control-input" id="locInputImage"
-            placeholder='e.g. "bottom-right corner"'>
-        </div>
         <div class="btn-row">
           <button class="btn btn-secondary btn-sm" id="btnBackImage">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
@@ -469,17 +459,7 @@ input[type="file"] { display: none; }
       <p class="doc-size" id="docSize"></p>
     </div>
     <div class="describe-form">
-      <div class="control-group">
-        <label class="control-label">What does the watermark look like?</label>
-        <input type="text" class="control-input" id="descInputDoc"
-          placeholder='e.g. "gray NotebookLM text with icon"'>
-      </div>
-      <div class="control-group">
-        <label class="control-label">Where is it on the page?</label>
-        <input type="text" class="control-input" id="locInputDoc"
-          placeholder='e.g. "bottom-right corner"'>
-        <p class="input-help">Each page will be analyzed and processed independently.</p>
-      </div>
+      <p class="input-help" style="margin-bottom: 0.5rem;">Each page will be analyzed and processed automatically.</p>
       <div class="describe-actions">
         <button class="btn btn-secondary" id="btnBackDoc">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
@@ -581,8 +561,8 @@ const steps = {
 };
 
 // Active desc/status/result elements depend on file type
-function getDescInput() { return isImageFile ? document.getElementById('descInputImage') : document.getElementById('descInputDoc'); }
-function getLocInput() { return isImageFile ? document.getElementById('locInputImage') : document.getElementById('locInputDoc'); }
+function getDescInput() { return { value: '' }; }
+function getLocInput() { return { value: '' }; }
 function getStatus() { return isImageFile ? document.getElementById('statusImage') : document.getElementById('statusDoc'); }
 function getAnalysisResult() { return isImageFile ? document.getElementById('analysisResultImage') : document.getElementById('analysisResultDoc'); }
 function getRemoveRow() { return isImageFile ? document.getElementById('removeRowImage') : document.getElementById('removeRowDoc'); }
@@ -1010,10 +990,6 @@ function doRestart() {
   uploadedFile = null; drawnRect = null; analysisData = null; cleanBlob = null;
   isImageFile = false;
   fileInput.value = '';
-  document.getElementById('descInputImage').value = '';
-  document.getElementById('locInputImage').value = '';
-  document.getElementById('descInputDoc').value = '';
-  document.getElementById('locInputDoc').value = '';
   document.getElementById('analysisResultImage').innerHTML = '';
   document.getElementById('analysisResultDoc').innerHTML = '';
   document.getElementById('removeRowImage').style.display = 'none';

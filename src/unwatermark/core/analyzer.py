@@ -76,6 +76,11 @@ _ANALYSIS_PROMPT_TEMPLATE = (
     "Err on the side of detecting watermarks — false negatives are worse than "
     "false positives for this use case.\n"
     "\n"
+    "PRIORITY: If there are multiple watermarks, report the LARGEST and most "
+    "prominent one first. A large diagonal 'SAMPLE PREVIEW' spanning the slide "
+    "is far more important than a small logo in the corner. Always prioritize "
+    "watermarks that cover a large area over small corner marks.\n"
+    "\n"
     "Rules for strategy selection:\n"
     '- "solid_fill": Watermark on a uniform solid color background.\n'
     '- "gradient_fill": Watermark on a smooth color gradient.\n'
