@@ -3,6 +3,391 @@
 from unwatermark.pages.layout import page
 
 APP_PAGE = page("App", """
+<style>
+/* Steps */
+.step { display: none; }
+.step.active { display: block; }
+
+/* Drop zone */
+.drop-zone {
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius);
+  padding: 5rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s var(--ease);
+  background: var(--color-bg-alt);
+  position: relative;
+}
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.06);
+}
+.drop-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+  margin: 0 auto 1.25rem;
+  transition: all 0.25s var(--ease);
+}
+.drop-zone:hover .drop-icon,
+.drop-zone.dragover .drop-icon {
+  background: var(--color-primary-light);
+  box-shadow: var(--shadow);
+}
+.drop-zone.dragover .drop-icon svg { stroke: var(--color-primary); }
+.drop-title {
+  font-family: 'DM Sans', sans-serif;
+  color: var(--color-text);
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  letter-spacing: -0.01em;
+}
+.drop-formats {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 0.15rem;
+}
+.drop-size {
+  color: var(--color-text-faint);
+  font-size: 0.82rem;
+}
+input[type="file"] { display: none; }
+
+/* Annotate layout — image files */
+.annotate-layout {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+}
+.canvas-area {
+  flex: 1;
+  min-width: 0;
+}
+.controls-panel {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+@media (max-width: 768px) {
+  .annotate-layout { flex-direction: column; gap: 1.25rem; }
+  .controls-panel { width: 100%; }
+}
+
+/* Canvas */
+.canvas-wrapper {
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  overflow: hidden;
+  position: relative;
+  box-shadow: var(--shadow);
+}
+.canvas-wrapper canvas {
+  display: block;
+  width: 100%;
+  cursor: crosshair;
+}
+.canvas-hint {
+  font-size: 0.82rem;
+  color: var(--color-text-faint);
+  margin-top: 0.6rem;
+  line-height: 1.5;
+}
+
+/* Controls card wrapper */
+.controls-card {
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+.controls-card .control-group { margin-bottom: 1rem; }
+.controls-card .control-group:last-child { margin-bottom: 0; }
+
+/* Describe layout — document files */
+.describe-layout {
+  max-width: 560px;
+  margin: 0 auto;
+}
+.doc-card {
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  padding: 2rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+.doc-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius);
+  background: var(--color-bg-alt);
+  margin: 0 auto 0.75rem;
+}
+.doc-name {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  color: var(--color-text);
+  font-size: 1.05rem;
+  margin-bottom: 0.2rem;
+}
+.doc-size {
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}
+.describe-form {
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  padding: 1.75rem;
+  box-shadow: var(--shadow-sm);
+}
+.describe-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+.describe-actions .btn-primary { flex: 1; }
+.input-help {
+  font-size: 0.82rem;
+  color: var(--color-text-faint);
+  margin-top: 0.35rem;
+}
+
+/* Analysis card */
+.analysis-card {
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-top: 1rem;
+  box-shadow: var(--shadow);
+}
+.analysis-card h3 {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 0.75rem;
+}
+.analysis-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.analysis-label {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.analysis-value {
+  font-size: 0.92rem;
+  color: var(--color-text);
+  margin-top: 0.15rem;
+}
+.confidence-bar {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-light);
+  margin-top: 0.3rem;
+  overflow: hidden;
+}
+.confidence-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.4s var(--ease);
+}
+.confidence-high { background: var(--color-success); }
+.confidence-mid { background: var(--color-warning); }
+.confidence-low { background: var(--color-error); }
+.reasoning {
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  margin-top: 0.6rem;
+  line-height: 1.55;
+  grid-column: 1 / -1;
+}
+
+/* Result card (documents) */
+.result-card {
+  max-width: 520px;
+  margin: 2.5rem auto;
+  text-align: center;
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  padding: 3rem 2.5rem;
+  box-shadow: var(--shadow-md);
+}
+.result-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--color-success-light);
+  margin-bottom: 1.25rem;
+}
+.result-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+.result-subtitle {
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+.result-filename {
+  display: inline-block;
+  background: var(--color-bg-alt);
+  border-radius: var(--radius-full);
+  padding: 0.55rem 1.25rem;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+/* Error alert */
+.error-alert {
+  background: var(--color-error-light);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+.error-alert svg { flex-shrink: 0; margin-top: 2px; }
+.error-alert p { font-size: 0.9rem; color: #991b1b; line-height: 1.5; }
+
+/* Compare */
+.compare-container {
+  position: relative;
+  max-width: 100%;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  user-select: none;
+  box-shadow: var(--shadow-md);
+  background: var(--color-bg);
+}
+.compare-container img { display: block; max-width: 100%; }
+.compare-after {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  overflow: hidden;
+  border-right: 2px solid var(--color-primary);
+}
+.compare-after img { display: block; max-width: none; }
+.compare-handle {
+  position: absolute;
+  top: 0;
+  width: 40px;
+  height: 100%;
+  cursor: ew-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+.compare-handle-line {
+  width: 2px;
+  height: 100%;
+  background: var(--color-primary);
+  position: absolute;
+}
+.compare-handle-grip {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s var(--ease);
+}
+.compare-handle-grip:hover {
+  transform: scale(1.1);
+}
+.compare-tag {
+  position: absolute;
+  top: 12px;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.before-tag { right: 12px; background: rgba(220,38,38,0.85); color: #fff; }
+.after-tag { left: 12px; background: rgba(5,150,105,0.85); color: #fff; }
+
+/* Progress bar */
+.progress-panel {
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-top: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+.progress-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.92rem;
+  color: var(--color-text);
+  margin-bottom: 0.6rem;
+  font-weight: 600;
+}
+.progress-track {
+  height: 8px;
+  background: var(--color-border-light);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  transition: width 0.3s var(--ease);
+  width: 0%;
+}
+.progress-status {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin-top: 0.5rem;
+}
+
+/* Result buttons */
+.result-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+</style>
+
 <div class="steps-bar">
   <div class="step-indicator active" id="ind1"><span class="step-num">1</span>Upload</div>
   <div class="step-indicator" id="ind2"><span class="step-num">2</span><span id="step2Label">Annotate</span></div>
@@ -13,7 +398,7 @@ APP_PAGE = page("App", """
 <div class="step active" id="stepUpload">
   <div class="drop-zone" id="dropZone">
     <div class="drop-icon">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#aaaaaa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
         <polyline points="17 8 12 3 7 8"/>
         <line x1="12" y1="3" x2="12" y2="15"/>
@@ -37,31 +422,36 @@ APP_PAGE = page("App", """
       <p class="canvas-hint" id="canvasHint">Draw a rectangle around the watermark, or let AI find it automatically.</p>
     </div>
     <div class="controls-panel">
-      <div class="control-group">
-        <label class="control-label">What does it look like?</label>
-        <input type="text" class="control-input" id="descInputImage"
-          placeholder='e.g. "gray NotebookLM text with icon"'>
-      </div>
-      <div class="control-group">
-        <label class="control-label">Where is it?</label>
-        <input type="text" class="control-input" id="locInputImage"
-          placeholder='e.g. "bottom-right corner"'>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-secondary" id="btnBackImage">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-          Back
-        </button>
-        <button class="btn btn-secondary" id="btnClearRect" disabled>Clear Selection</button>
+      <div class="controls-card">
+        <div class="control-group">
+          <label class="control-label">What does it look like?</label>
+          <input type="text" class="control-input" id="descInputImage"
+            placeholder='e.g. "gray NotebookLM text with icon"'>
+        </div>
+        <div class="control-group">
+          <label class="control-label">Where is it?</label>
+          <input type="text" class="control-input" id="locInputImage"
+            placeholder='e.g. "bottom-right corner"'>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-secondary btn-sm" id="btnBackImage">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            Back
+          </button>
+          <button class="btn btn-secondary btn-sm" id="btnClearRect" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Clear Selection
+          </button>
+        </div>
       </div>
       <button class="btn btn-primary btn-full" id="btnAnalyzeImage">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         Analyze with AI
       </button>
       <div id="analysisResultImage"></div>
       <div id="removeRowImage" style="display:none;">
         <button class="btn btn-primary btn-full" id="btnRemoveImage">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>
           Remove Watermark
         </button>
       </div>
@@ -73,7 +463,7 @@ APP_PAGE = page("App", """
   <div class="describe-layout" id="docLayout" style="display:none;">
     <div class="doc-card" id="docCard">
       <div class="doc-icon">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       </div>
       <p class="doc-name" id="docName"></p>
       <p class="doc-size" id="docSize"></p>
@@ -96,14 +486,14 @@ APP_PAGE = page("App", """
           Back
         </button>
         <button class="btn btn-primary" id="btnAnalyzeDoc">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           Analyze with AI
         </button>
       </div>
       <div id="analysisResultDoc"></div>
       <div id="removeRowDoc" style="display:none;">
         <button class="btn btn-primary btn-full" id="btnRemoveDoc">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>
           Remove Watermark
         </button>
       </div>
@@ -130,7 +520,7 @@ APP_PAGE = page("App", """
       <span class="compare-tag before-tag">Before</span>
       <span class="compare-tag after-tag">After</span>
     </div>
-    <div class="btn-row" style="justify-content:center;margin-top:1.25rem;">
+    <div class="result-actions" style="margin-top:1.5rem;">
       <button class="btn btn-secondary" id="btnRetry">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
         Try Again
@@ -147,12 +537,12 @@ APP_PAGE = page("App", """
   <div id="docResult" style="display:none;">
     <div class="result-card">
       <div class="result-icon">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>
       </div>
       <h2 class="result-title">Watermarks Removed</h2>
       <p class="result-subtitle" id="resultSubtitle">Your clean file is ready to download.</p>
       <div class="result-filename" id="resultFilename"></div>
-      <div class="btn-row" style="justify-content:center;margin-top:1.5rem;">
+      <div class="result-actions" style="margin-top:1.75rem;">
         <button class="btn btn-secondary" id="btnRestartDoc">Start Over</button>
         <button class="btn btn-primary btn-lg" id="btnDownloadDoc">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -162,181 +552,6 @@ APP_PAGE = page("App", """
     </div>
   </div>
 </div>
-
-<style>
-/* Steps */
-.step { display: none; }
-.step.active { display: block; }
-
-/* Drop zone */
-.drop-zone {
-  border: 2px dashed var(--border); border-radius: var(--radius); padding: 3.5rem 2rem;
-  text-align: center; cursor: pointer; transition: all 0.2s;
-  background: var(--bg-primary);
-}
-.drop-zone:hover, .drop-zone.dragover {
-  border-color: var(--accent); background: var(--accent-light);
-}
-.drop-icon { margin-bottom: 0.75rem; }
-.drop-zone.dragover .drop-icon svg { stroke: var(--accent); }
-.drop-title { color: var(--text-heading); font-size: 1.05rem; font-weight: 500; margin-bottom: 0.25rem; }
-.drop-formats { color: var(--text-muted); font-size: 0.88rem; }
-.drop-size { color: var(--text-faint); font-size: 0.82rem; margin-top: 0.15rem; }
-input[type="file"] { display: none; }
-
-/* Annotate layout — image files */
-.annotate-layout { display: flex; gap: 1.5rem; }
-.canvas-area { flex: 1; min-width: 0; }
-.controls-panel { width: 260px; flex-shrink: 0; }
-@media (max-width: 768px) {
-  .annotate-layout { flex-direction: column; }
-  .controls-panel { width: 100%; }
-}
-
-/* Canvas */
-.canvas-wrapper {
-  background: var(--bg-primary); border: 1px solid var(--border);
-  border-radius: var(--radius); overflow: hidden; position: relative;
-}
-.canvas-wrapper canvas { display: block; width: 100%; cursor: crosshair; }
-.canvas-hint { font-size: 0.82rem; color: var(--text-faint); margin-top: 0.4rem; }
-
-/* Describe layout — document files */
-.describe-layout {
-  max-width: 520px; margin: 0 auto;
-}
-.doc-card {
-  background: var(--bg-primary); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 1.75rem; text-align: center;
-  margin-bottom: 1.25rem;
-}
-.doc-icon { margin-bottom: 0.5rem; }
-.doc-name { font-weight: 600; color: var(--text-heading); font-size: 1rem; margin-bottom: 0.15rem; }
-.doc-size { color: var(--text-muted); font-size: 0.88rem; }
-.describe-form {}
-.describe-actions { display: flex; gap: 0.75rem; margin-top: 1rem; }
-.describe-actions .btn-primary { flex: 1; }
-.input-help { font-size: 0.82rem; color: var(--text-faint); margin-top: 0.35rem; }
-
-/* Controls */
-.control-group { margin-bottom: 0.85rem; }
-.control-label {
-  font-size: 0.88rem; font-weight: 600; color: var(--text-body);
-  display: block; margin-bottom: 0.3rem;
-}
-.control-input {
-  width: 100%; background: var(--bg-secondary);
-  border: 1px solid var(--border); color: var(--text-heading);
-  padding: 0.55rem 0.75rem; border-radius: var(--radius); font-size: 0.92rem;
-  font-family: inherit; transition: border-color 0.15s;
-}
-.control-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,71,171,0.12); }
-.control-input::placeholder { color: var(--text-faint); }
-.btn-full { width: 100%; }
-
-/* Analysis card */
-.analysis-card {
-  background: var(--bg-primary); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 1rem; margin-top: 0.85rem;
-}
-.analysis-card h3 {
-  font-size: 0.95rem; font-weight: 600; color: var(--text-heading);
-  margin-bottom: 0.6rem;
-}
-.analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
-.analysis-item {}
-.analysis-label {
-  font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;
-  letter-spacing: 0.04em; font-weight: 600;
-}
-.analysis-value { font-size: 0.92rem; color: var(--text-heading); margin-top: 0.1rem; }
-.confidence-bar { height: 3px; border-radius: 2px; background: var(--border-light); margin-top: 0.25rem; }
-.confidence-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
-.confidence-high { background: var(--success); }
-.confidence-mid { background: #d97706; }
-.confidence-low { background: var(--error); }
-.reasoning {
-  font-size: 0.88rem; color: var(--text-muted); margin-top: 0.5rem;
-  line-height: 1.5; grid-column: 1 / -1;
-}
-
-/* Result card (documents) */
-.result-card {
-  max-width: 480px; margin: 2rem auto; text-align: center;
-  background: var(--bg-primary); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 2.5rem 2rem;
-}
-.result-icon { margin-bottom: 1rem; }
-.result-title {
-  font-family: 'Josefin Sans', sans-serif; font-size: 1.5rem;
-  font-weight: 700; color: var(--text-heading); margin-bottom: 0.5rem;
-}
-.result-subtitle { color: var(--text-muted); font-size: 1rem; margin-bottom: 1rem; }
-.result-filename {
-  display: inline-block; background: var(--bg-secondary); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 0.5rem 1rem;
-  font-size: 0.92rem; color: var(--text-body); font-weight: 500;
-}
-.btn-lg { padding: 0.7rem 1.5rem; font-size: 1rem; }
-
-/* Error alert */
-.error-alert {
-  background: var(--error-bg); border: 1px solid var(--error-border); border-radius: var(--radius);
-  padding: 0.65rem 0.85rem; margin-top: 0.85rem; display: flex; gap: 0.4rem;
-  align-items: flex-start;
-}
-.error-alert svg { flex-shrink: 0; margin-top: 1px; }
-.error-alert p { font-size: 0.92rem; color: #991b1b; line-height: 1.4; }
-
-/* Compare */
-.compare-container {
-  position: relative; max-width: 100%; border-radius: var(--radius);
-  overflow: hidden; user-select: none;
-  border: 1px solid var(--border); background: var(--bg-primary);
-}
-.compare-container img { display: block; max-width: 100%; }
-.compare-after {
-  position: absolute; top: 0; left: 0; height: 100%;
-  overflow: hidden; border-right: 2px solid var(--accent);
-}
-.compare-after img { display: block; max-width: none; }
-.compare-handle {
-  position: absolute; top: 0; width: 40px; height: 100%;
-  cursor: ew-resize; display: flex; align-items: center; justify-content: center;
-  transform: translateX(-50%); z-index: 2;
-}
-.compare-handle-line { width: 2px; height: 100%; background: var(--accent); position: absolute; }
-.compare-handle-grip {
-  width: 30px; height: 30px; border-radius: 50%; background: var(--accent);
-  display: flex; align-items: center; justify-content: center; z-index: 1;
-}
-.compare-tag {
-  position: absolute; top: 8px; padding: 2px 8px; border-radius: 2px;
-  font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
-}
-.before-tag { right: 8px; background: rgba(220,38,38,0.85); color: #fff; }
-.after-tag { left: 8px; background: rgba(5,150,105,0.85); color: #fff; }
-
-/* Progress bar */
-.progress-panel {
-  background: var(--bg-primary); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 1.25rem; margin-top: 0.85rem;
-}
-.progress-label {
-  font-size: 0.92rem; color: var(--text-body); margin-bottom: 0.5rem;
-  font-weight: 600;
-}
-.progress-track {
-  height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
-}
-.progress-fill {
-  height: 100%; background: var(--accent); border-radius: 3px;
-  transition: width 0.3s ease; width: 0%;
-}
-.progress-status {
-  font-size: 0.88rem; color: var(--text-muted); margin-top: 0.4rem;
-}
-</style>
 
 <script>
 // State
@@ -424,7 +639,7 @@ function handleFile() {
     alert('File exceeds 50 MB limit.'); return;
   }
 
-  isImageFile = /\\.(png|jpe?g|bmp|tiff|webp)$/i.test(uploadedFile.name);
+  isImageFile = /\.(png|jpe?g|bmp|tiff|webp)$/i.test(uploadedFile.name);
 
   if (isImageFile) {
     step2Label.textContent = 'Annotate';
@@ -631,14 +846,14 @@ function renderAnalysis(a) {
         </div>
         <div class="analysis-item">
           <div class="analysis-label">Description</div>
-          <div class="analysis-value">${a.description || '\\u2014'}</div>
+          <div class="analysis-value">${a.description || '\u2014'}</div>
         </div>
         ${a.reasoning ? `<div class="reasoning">${a.reasoning}</div>` : ''}
       </div>
     </div>` : `
     <div class="analysis-card">
       <h3>No Watermark Found</h3>
-      <p style="color:var(--text-muted);font-size:0.82rem;">Try adding a description of the watermark.</p>
+      <p style="color:var(--color-text-muted);font-size:0.82rem;">Try adding a description of the watermark.</p>
     </div>`;
 }
 
@@ -695,7 +910,7 @@ async function doRemove() {
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\\n');
+      const lines = buffer.split('\n');
       buffer = lines.pop();
       for (const line of lines) {
         if (!line.trim()) continue;
