@@ -15,10 +15,12 @@ dependencies = [
     "numpy>=1.24",
     "anthropic>=0.40",
     "python-dotenv>=1.0",
-    "easyocr>=1.7",
 ]
 
 [project.optional-dependencies]
+ocr = [
+    "easyocr>=1.7",
+]
 web = [
     "fastapi>=0.104",
     "uvicorn>=0.24",
@@ -33,8 +35,13 @@ inpaint = [
 replicate = [
     "replicate>=0.25",
 ]
+# Lightweight deploy: web + replicate only (no PyTorch, fits in 512MB RAM)
+deploy = [
+    "unwatermark[web,replicate]",
+]
+# Full local install: everything including local ML models
 all = [
-    "unwatermark[web,openai,inpaint,replicate]",
+    "unwatermark[ocr,web,openai,inpaint,replicate]",
 ]
 dev = [
     "pytest>=7.0",

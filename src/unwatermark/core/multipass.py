@@ -19,10 +19,17 @@ from PIL import Image
 
 from unwatermark.config import Config
 from unwatermark.core.detector import detect_watermark
-from unwatermark.core.ocr_detector import detect_watermark_ocr
 from unwatermark.core.remover import remove_watermark
 from unwatermark.models.analysis import WatermarkAnalysis
 from unwatermark.models.annotation import UserAnnotation
+
+# EasyOCR is optional — not available on lightweight deployments
+try:
+    from unwatermark.core.ocr_detector import detect_watermark_ocr
+
+    _HAS_EASYOCR = True
+except ImportError:
+    _HAS_EASYOCR = False
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +80,10 @@ def clean_image(
             analysis = detect_watermark(current, config, annotation)
         else:
             # Subsequent passes: OCR only (fast, no API calls)
+            # On lightweight deployments without EasyOCR, skip extra passes
+            if not _HAS_EASYOCR:
+                logger.info(f"Pass {pass_num}: EasyOCR not installed — skipping extra passes")
+                break
             ocr_result = detect_watermark_ocr(current, known_text=known_text)
             if ocr_result is not None:
                 analysis = ocr_result

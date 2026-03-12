@@ -69,6 +69,12 @@ async def favicon():
     return Response(content=FAVICON_SVG, media_type="image/svg+xml")
 
 
+@app.get("/healthz")
+async def healthz():
+    """Health check endpoint — used by external ping services to keep the server warm."""
+    return JSONResponse({"status": "ok"})
+
+
 # ---------------------------------------------------------------------------
 # API endpoints
 # ---------------------------------------------------------------------------

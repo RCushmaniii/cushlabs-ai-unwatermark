@@ -16,9 +16,16 @@ from PIL import Image
 from unwatermark.config import Config
 from unwatermark.core.analyzer import _heuristic_fallback, analyze_watermark
 from unwatermark.core.florence_detector import detect_watermark_florence
-from unwatermark.core.ocr_detector import detect_watermark_ocr
 from unwatermark.models.analysis import WatermarkAnalysis
 from unwatermark.models.annotation import UserAnnotation
+
+# EasyOCR is optional — not available on lightweight deployments (e.g. Render free tier)
+try:
+    from unwatermark.core.ocr_detector import detect_watermark_ocr
+
+    _HAS_EASYOCR = True
+except ImportError:
+    _HAS_EASYOCR = False
 
 logger = logging.getLogger(__name__)
 
@@ -45,21 +52,25 @@ def detect_watermark(
         WatermarkAnalysis with detection results and recommended strategy.
     """
     # Layer 1: OCR detection (deterministic, same result every time)
+    # Skipped on lightweight deployments where EasyOCR/PyTorch aren't installed
     known_text = None
     if annotation and annotation.has_description:
         known_text = annotation.description
 
-    try:
-        ocr_result = detect_watermark_ocr(image, known_text=known_text)
-        if ocr_result is not None:
-            logger.info(
-                f"OCR detection succeeded: '{ocr_result.description}' "
-                f"confidence={ocr_result.confidence}"
-            )
-            return ocr_result
-        logger.info("OCR found no text watermark — trying Florence-2")
-    except Exception as e:
-        logger.warning(f"OCR detection failed: {e} — trying Florence-2")
+    if _HAS_EASYOCR:
+        try:
+            ocr_result = detect_watermark_ocr(image, known_text=known_text)
+            if ocr_result is not None:
+                logger.info(
+                    f"OCR detection succeeded: '{ocr_result.description}' "
+                    f"confidence={ocr_result.confidence}"
+                )
+                return ocr_result
+            logger.info("OCR found no text watermark — trying Florence-2")
+        except Exception as e:
+            logger.warning(f"OCR detection failed: {e} — trying Florence-2")
+    else:
+        logger.info("EasyOCR not installed — skipping to Florence-2")
 
     # Layer 2: Florence-2 via Replicate (cheap, fast, handles visual watermarks)
     if config.has_replicate_token:
