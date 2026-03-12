@@ -116,6 +116,34 @@ def clean_image(
         # Free memory between passes — LaMa and OCR are memory-hungry
         gc.collect()
 
+    # Final AI pass: if we removed watermarks via OCR but the full detection
+    # stack wasn't exhausted on the last pass, run one more full-stack check.
+    # This catches watermarks that OCR can't see (diagonal text, logos) but
+    # that Claude/GPT-4o Vision can detect. Only runs if:
+    #   1. We already removed at least one watermark (so there was a real watermark)
+    #   2. AI detection is available (has API key)
+    #   3. The first pass found something via OCR (meaning AI was never tried)
+    if (
+        removed > 0
+        and config.use_ai
+        and config.can_use_ai
+        and first_analysis is not None
+        and first_analysis.description.startswith("Text watermark:")  # OCR result
+    ):
+        logger.info("Final pass: full-stack check for non-text watermarks (diagonal, logos)")
+        final_analysis = detect_watermark(current, config, annotation)
+        if final_analysis.watermark_found:
+            r = final_analysis.region
+            logger.info(
+                f"Final pass: found '{final_analysis.description}' "
+                f"at ({r.x},{r.y},{r.width}x{r.height})"
+            )
+            current = remove_watermark(current, final_analysis, config, force_strategy)
+            removed += 1
+            gc.collect()
+        else:
+            logger.info("Final pass: no additional watermarks found")
+
     if removed > 1:
         logger.info(f"Multi-pass complete: removed {removed} watermarks")
 
