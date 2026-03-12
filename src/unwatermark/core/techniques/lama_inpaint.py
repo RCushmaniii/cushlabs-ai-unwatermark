@@ -96,52 +96,59 @@ class LamaInpaintTechnique(RemovalTechnique):
     def _refine_mask_in_region(
         image: Image.Image, region: WatermarkRegion
     ) -> np.ndarray | None:
-        """Try to isolate watermark pixels within the bounding box.
+        """Isolate watermark pixels within the bounding box using local deviation.
 
-        Semi-transparent watermarks are typically lighter/more washed out than
-        the content beneath them. This method detects pixels in the region that
-        have low saturation and high lightness (typical of gray/white watermarks)
-        relative to the surrounding area.
+        Uses a median filter to estimate what the local background looks like
+        without the watermark, then finds pixels that deviate from that estimate.
+        Semi-transparent watermark text creates detectable local deviations even
+        when the watermark and background have similar overall color properties.
 
         Returns a 2D uint8 array (region-sized) with 255 for watermark pixels
         and 0 for content pixels, or None if refinement isn't confident.
         """
         try:
-            # Crop the region
+            from scipy.ndimage import (
+                binary_closing,
+                binary_dilation,
+                binary_opening,
+                median_filter,
+            )
+        except ImportError:
+            logger.debug("scipy not installed — skipping mask refinement")
+            return None
+
+        try:
             crop = image.crop((region.x, region.y, region.x2, region.y2))
-            crop_arr = np.array(crop.convert("RGB"), dtype=np.float32)
+            pixels = np.array(crop.convert("L"), dtype=np.float32)
 
-            if crop_arr.size == 0:
+            if pixels.size == 0 or min(pixels.shape) < 10:
                 return None
 
-            # Calculate per-pixel saturation: low saturation = grayish (watermark-like)
-            r, g, b = crop_arr[:, :, 0], crop_arr[:, :, 1], crop_arr[:, :, 2]
-            max_c = np.maximum(np.maximum(r, g), b)
-            min_c = np.minimum(np.minimum(r, g), b)
-            range_c = max_c - min_c
-            lightness = (max_c + min_c) / 2.0
+            # Median filter estimates local background — the median "ignores"
+            # watermark pixels when the kernel is larger than the text stroke width.
+            # kernel_size=21 works for typical watermark text (stroke width ~3-8px).
+            local_bg = median_filter(pixels, size=21)
 
-            # Watermark pixels tend to be low-saturation and mid-to-high lightness
-            # compared to content which is either very dark (text) or colorful (photos)
-            is_low_saturation = range_c < 40  # gray-ish
-            is_mid_light = lightness > 100  # not too dark
+            # Deviation from local background reveals watermark text
+            deviation = np.abs(pixels - local_bg)
 
-            # Also check: watermark pixels are usually within a narrow brightness band
-            # (semi-transparent overlay makes nearby pixels similar brightness)
-            watermark_mask = is_low_saturation & is_mid_light
+            # Threshold: pixels deviating more than 5 levels are likely watermark.
+            # This value works well for semi-transparent gray text on light backgrounds.
+            mask_bool = deviation > 5
 
-            # If the mask covers less than 5% or more than 90% of the region,
-            # the refinement probably isn't useful — fall back to rectangle
-            coverage = np.sum(watermark_mask) / watermark_mask.size
-            if coverage < 0.05 or coverage > 0.90:
+            # Morphological cleanup: remove noise, fill text stroke gaps,
+            # then dilate enough for LaMa to have context for clean fill
+            struct = np.ones((3, 3))
+            mask_bool = binary_opening(mask_bool, structure=struct, iterations=1)
+            mask_bool = binary_closing(mask_bool, structure=struct, iterations=2)
+            mask_bool = binary_dilation(mask_bool, structure=struct, iterations=3)
+
+            coverage = np.sum(mask_bool) / mask_bool.size
+            if coverage < 0.01 or coverage > 0.85:
+                # Too little = no watermark found in region; too much = false positive
                 return None
 
-            # Dilate the mask slightly to ensure we catch watermark edges
-            from PIL import ImageFilter
-            mask_img = Image.fromarray((watermark_mask * 255).astype(np.uint8), mode="L")
-            mask_img = mask_img.filter(ImageFilter.MaxFilter(5))
-
-            return np.array(mask_img)
+            return (mask_bool.astype(np.uint8) * 255)
 
         except Exception as e:
             logger.debug(f"Mask refinement failed: {e}")
