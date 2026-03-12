@@ -639,7 +639,7 @@ function handleFile() {
     alert('File exceeds 50 MB limit.'); return;
   }
 
-  isImageFile = /\.(png|jpe?g|bmp|tiff|webp)$/i.test(uploadedFile.name);
+  isImageFile = /\\.(png|jpe?g|bmp|tiff|webp)$/i.test(uploadedFile.name);
 
   if (isImageFile) {
     step2Label.textContent = 'Annotate';
@@ -910,7 +910,7 @@ async function doRemove() {
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
+      const lines = buffer.split('\\n');
       buffer = lines.pop();
       for (const line of lines) {
         if (!line.trim()) continue;
