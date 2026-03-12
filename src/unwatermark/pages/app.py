@@ -2,7 +2,7 @@
 
 from unwatermark.pages.layout import page
 
-APP_PAGE = page("App", """
+APP_PAGE = page("Remove Watermarks", """
 <style>
 /* Steps */
 .step { display: none; }
@@ -1026,4 +1026,4 @@ function doRestart() {
 document.getElementById('btnRestart').addEventListener('click', doRestart);
 document.getElementById('btnRestartDoc').addEventListener('click', doRestart);
 </script>
-""", active_nav="app")
+""", active_nav="app", description="Upload an image, PDF, or PPTX to remove watermarks with AI. Draw a selection, let AI detect, and download your clean file instantly.", canonical_path="/app")

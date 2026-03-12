@@ -97,8 +97,9 @@ TERMS_PAGE = page("Terms of Service", """
   <div class="card">
     <h2 class="section-title">9. Contact</h2>
     <div class="prose">
-      <p>For questions about these Terms, contact us at <a href="mailto:info@cushlabs.ai">info@cushlabs.ai</a>.</p>
+      <p>For questions about these Terms, contact us via our <a href="/contact">contact page</a> or email <span id="termsEmail"></span>.</p>
+      <script>(function(){var e=document.getElementById('termsEmail');if(e){var a=document.createElement('a');var p=['in','fo'];var d=['cush','labs','.','ai'];var addr=p.join('')+String.fromCharCode(64)+d.join('');a.href='ma'+'il'+'to:'+addr;a.textContent=addr;e.appendChild(a);}})()</script>
     </div>
   </div>
 </div>
-""", active_nav="")
+""", active_nav="", description="Terms of Service for Unwatermark by CushLabs AI Services. Read our acceptable use policy, file handling practices, and legal terms.", canonical_path="/terms")

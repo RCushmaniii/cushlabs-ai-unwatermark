@@ -97,6 +97,43 @@ async def healthz():
 
 
 # ---------------------------------------------------------------------------
+# SEO — robots.txt and sitemap.xml
+# ---------------------------------------------------------------------------
+
+_SITE_URL = "https://unwatermark.cushlabs.ai"
+
+_ROBOTS_TXT = f"""User-agent: *
+Allow: /
+Disallow: /analyze
+Disallow: /process
+Disallow: /download/
+
+Sitemap: {_SITE_URL}/sitemap.xml
+"""
+
+_SITEMAP_XML = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{_SITE_URL}/</loc><priority>1.0</priority><changefreq>weekly</changefreq></url>
+  <url><loc>{_SITE_URL}/app</loc><priority>0.9</priority><changefreq>weekly</changefreq></url>
+  <url><loc>{_SITE_URL}/help</loc><priority>0.7</priority><changefreq>monthly</changefreq></url>
+  <url><loc>{_SITE_URL}/contact</loc><priority>0.5</priority><changefreq>monthly</changefreq></url>
+  <url><loc>{_SITE_URL}/terms</loc><priority>0.3</priority><changefreq>yearly</changefreq></url>
+  <url><loc>{_SITE_URL}/privacy</loc><priority>0.3</priority><changefreq>yearly</changefreq></url>
+</urlset>
+"""
+
+
+@app.get("/robots.txt")
+async def robots_txt():
+    return Response(content=_ROBOTS_TXT.strip(), media_type="text/plain")
+
+
+@app.get("/sitemap.xml")
+async def sitemap_xml():
+    return Response(content=_SITEMAP_XML.strip(), media_type="application/xml")
+
+
+# ---------------------------------------------------------------------------
 # API endpoints
 # ---------------------------------------------------------------------------
 

@@ -1,20 +1,90 @@
 """Shared page layout — nav, footer, base styles."""
 
 
-def page(title: str, body: str, active_nav: str = "", full_width: bool = False) -> str:
-    """Wrap page content in the shared layout shell."""
+_DEFAULT_DESC = "AI-powered watermark removal for images, PDFs, and presentations. Fast, private, and free."
+_SITE_NAME = "Unwatermark"
+_SITE_URL = "https://unwatermark.cushlabs.ai"
+
+
+def page(
+    title: str,
+    body: str,
+    active_nav: str = "",
+    full_width: bool = False,
+    description: str = "",
+    canonical_path: str = "",
+) -> str:
+    """Wrap page content in the shared layout shell.
+
+    Args:
+        title: Page title (appended with " — Unwatermark")
+        body: HTML body content
+        active_nav: Which nav link to highlight (home, app, help, contact)
+        full_width: If True, main has no max-width (for landing pages)
+        description: Meta description for SEO. Falls back to default.
+        canonical_path: Canonical URL path (e.g. "/app"). Auto-derived from active_nav if empty.
+    """
+    meta_desc = description or _DEFAULT_DESC
+    full_title = f"{title} — {_SITE_NAME}"
+
+    # Derive canonical path from active_nav if not explicitly set
+    if not canonical_path:
+        _nav_paths = {"home": "/", "app": "/app", "help": "/help", "contact": "/contact"}
+        canonical_path = _nav_paths.get(active_nav, "")
+    canonical_tag = f'<link rel="canonical" href="{_SITE_URL}{canonical_path}">' if canonical_path else ""
+
     main_class = "main main--full" if full_width else "main"
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{title} — Unwatermark</title>
-<meta name="description" content="AI-powered watermark removal for images, PDFs, and presentations. Fast, private, and free.">
+<title>{full_title}</title>
+<meta name="description" content="{meta_desc}">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#2563eb">
+{canonical_tag}
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{_SITE_NAME}">
+<meta property="og:title" content="{full_title}">
+<meta property="og:description" content="{meta_desc}">
+{f'<meta property="og:url" content="{_SITE_URL}{canonical_path}">' if canonical_path else ""}
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{full_title}">
+<meta name="twitter:description" content="{meta_desc}">
+
 <link rel="icon" href="/favicon.ico" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300..700&family=Inter:wght@300..700&display=swap" rel="stylesheet">
+
+<!-- Structured Data -->
+<script type="application/ld+json">
+{{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "{_SITE_NAME}",
+  "description": "{_DEFAULT_DESC}",
+  "url": "{_SITE_URL}",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "Any",
+  "offers": {{
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }},
+  "creator": {{
+    "@type": "Organization",
+    "name": "CushLabs AI Services",
+    "url": "https://cushlabs.ai"
+  }}
+}}
+</script>
+
 <style>
 {BASE_CSS}
 </style>

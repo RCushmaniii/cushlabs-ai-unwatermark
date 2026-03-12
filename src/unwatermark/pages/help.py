@@ -278,4 +278,4 @@ HELP_PAGE = page("Help Center", """
     </div>
   </div>
 </div>
-""", active_nav="help")
+""", active_nav="help", description="Learn how to use Unwatermark — step-by-step guide, removal techniques, CLI usage, and tips for best results.", canonical_path="/help")

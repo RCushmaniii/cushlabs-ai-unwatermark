@@ -2,7 +2,7 @@
 
 from unwatermark.pages.layout import page
 
-LANDING_PAGE = page("Home", """
+LANDING_PAGE = page("AI-Powered Watermark Removal", """
 <style>
 /* ================================================================
    Landing Page Sections
@@ -632,4 +632,4 @@ LANDING_PAGE = page("Home", """
     </a>
   </div>
 </section>
-""", active_nav="home", full_width=True)
+""", active_nav="home", full_width=True, description="Remove watermarks from images, PDFs, and presentations with AI. Free, fast, and private — no signup required. Powered by LaMa neural inpainting.", canonical_path="/")
