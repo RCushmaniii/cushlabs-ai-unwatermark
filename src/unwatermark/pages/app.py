@@ -61,208 +61,108 @@ APP_PAGE = page("Remove Watermarks", """
 }
 input[type="file"] { display: none; }
 
-/* Annotate layout — image files */
-.annotate-layout {
-  display: flex;
-  gap: 2rem;
-  align-items: flex-start;
-}
-.canvas-area {
-  flex: 1;
-  min-width: 0;
-}
-.controls-panel {
-  width: 300px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-@media (max-width: 768px) {
-  .annotate-layout { flex-direction: column; gap: 1.25rem; }
-  .controls-panel { width: 100%; }
-}
-
-/* Canvas */
-.canvas-wrapper {
-  background: var(--color-bg);
-  border-radius: var(--radius);
-  overflow: hidden;
-  position: relative;
-  box-shadow: var(--shadow);
-}
-.canvas-wrapper canvas {
-  display: block;
-  width: 100%;
-  cursor: crosshair;
-}
-.canvas-hint {
-  font-size: 0.82rem;
-  color: var(--color-text-faint);
-  margin-top: 0.6rem;
-  line-height: 1.5;
-}
-
-/* Controls card wrapper */
-.controls-card {
-  background: var(--color-bg);
-  border-radius: var(--radius);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-sm);
-}
-.controls-card .control-group { margin-bottom: 1rem; }
-.controls-card .control-group:last-child { margin-bottom: 0; }
-
-/* Describe layout — document files */
-.describe-layout {
-  max-width: 560px;
+/* Processing view */
+.processing-view {
+  max-width: 600px;
   margin: 0 auto;
 }
-.doc-card {
-  background: var(--color-bg);
-  border-radius: var(--radius);
-  padding: 2rem;
-  text-align: center;
+.processing-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
   margin-bottom: 1.5rem;
-  box-shadow: var(--shadow-sm);
 }
-.doc-icon {
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--color-bg);
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  width: 100%;
+}
+.file-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius);
-  background: var(--color-bg-alt);
-  margin: 0 auto 0.75rem;
+  flex-shrink: 0;
 }
-.doc-name {
-  font-family: 'DM Sans', sans-serif;
+.file-name {
   font-weight: 600;
   color: var(--color-text);
-  font-size: 1.05rem;
-  margin-bottom: 0.2rem;
 }
-.doc-size {
+.file-size {
   color: var(--color-text-muted);
-  font-size: 0.88rem;
-}
-.describe-form {
-  background: var(--color-bg);
-  border-radius: var(--radius);
-  padding: 1.75rem;
-  box-shadow: var(--shadow-sm);
-}
-.describe-actions {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 1.25rem;
-}
-.describe-actions .btn-primary { flex: 1; }
-.input-help {
-  font-size: 0.82rem;
-  color: var(--color-text-faint);
-  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  margin-left: auto;
 }
 
-/* Analysis card */
-.analysis-card {
-  background: var(--color-bg);
-  border-radius: var(--radius);
-  padding: 1.25rem;
-  margin-top: 1rem;
-  box-shadow: var(--shadow);
-}
-.analysis-card h3 {
-  font-family: 'DM Sans', sans-serif;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: 0.75rem;
-}
-.analysis-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-.analysis-label {
-  font-size: 0.72rem;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-}
-.analysis-value {
-  font-size: 0.92rem;
-  color: var(--color-text);
-  margin-top: 0.15rem;
-}
-.confidence-bar {
-  height: 4px;
-  border-radius: var(--radius-full);
+/* Progress bar (processing view) */
+.progress-track {
+  height: 8px;
   background: var(--color-border-light);
-  margin-top: 0.3rem;
+  border-radius: var(--radius-full);
   overflow: hidden;
 }
-.confidence-fill {
+.progress-fill {
   height: 100%;
+  background: var(--color-primary);
   border-radius: var(--radius-full);
-  transition: width 0.4s var(--ease);
-}
-.confidence-high { background: var(--color-success); }
-.confidence-mid { background: var(--color-warning); }
-.confidence-low { background: var(--color-error); }
-.reasoning {
-  font-size: 0.88rem;
-  color: var(--color-text-muted);
-  margin-top: 0.6rem;
-  line-height: 1.55;
-  grid-column: 1 / -1;
+  transition: width 0.3s var(--ease);
+  width: 0%;
 }
 
-/* Result card (documents) */
-.result-card {
-  max-width: 520px;
-  margin: 2.5rem auto;
-  text-align: center;
+/* Activity feed */
+.activity-feed {
   background: var(--color-bg);
-  border-radius: var(--radius-lg);
-  padding: 3rem 2.5rem;
-  box-shadow: var(--shadow-md);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow-sm);
+  margin-top: 1rem;
+  max-height: 400px;
+  overflow-y: auto;
 }
-.result-icon {
-  display: inline-flex;
+.activity-item {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: var(--color-success-light);
-  margin-bottom: 1.25rem;
-}
-.result-title {
-  font-family: 'DM Sans', sans-serif;
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: var(--color-text);
-  margin-bottom: 0.5rem;
-  letter-spacing: -0.02em;
-}
-.result-subtitle {
-  color: var(--color-text-muted);
-  font-size: 1rem;
-  margin-bottom: 1.25rem;
-  line-height: 1.5;
-}
-.result-filename {
-  display: inline-block;
-  background: var(--color-bg-alt);
-  border-radius: var(--radius-full);
-  padding: 0.55rem 1.25rem;
+  gap: 0.65rem;
+  padding: 0.5rem 0;
   font-size: 0.9rem;
-  color: var(--color-text-secondary);
+  animation: slideIn 0.2s ease;
+  border-bottom: 1px solid var(--color-border-light);
+}
+.activity-item:last-child {
+  border-bottom: none;
+}
+.activity-item.active {
+  color: var(--color-primary);
   font-weight: 500;
 }
+.activity-item.done {
+  color: var(--color-text-muted);
+}
+.activity-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border-light);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Error alert */
 .error-alert {
@@ -344,38 +244,48 @@ input[type="file"] { display: none; }
 .before-tag { right: 12px; background: rgba(220,38,38,0.85); color: #fff; }
 .after-tag { left: 12px; background: rgba(5,150,105,0.85); color: #fff; }
 
-/* Progress bar */
-.progress-panel {
+/* Result card (documents) */
+.result-card {
+  max-width: 520px;
+  margin: 2.5rem auto;
+  text-align: center;
   background: var(--color-bg);
-  border-radius: var(--radius);
-  padding: 1.5rem;
-  margin-top: 1rem;
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-lg);
+  padding: 3rem 2.5rem;
+  box-shadow: var(--shadow-md);
 }
-.progress-label {
+.result-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--color-success-light);
+  margin-bottom: 1.25rem;
+}
+.result-title {
   font-family: 'DM Sans', sans-serif;
-  font-size: 0.92rem;
+  font-size: 1.6rem;
+  font-weight: 700;
   color: var(--color-text);
-  margin-bottom: 0.6rem;
-  font-weight: 600;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
 }
-.progress-track {
-  height: 8px;
-  background: var(--color-border-light);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  background: var(--color-primary);
-  border-radius: var(--radius-full);
-  transition: width 0.3s var(--ease);
-  width: 0%;
-}
-.progress-status {
-  font-size: 0.85rem;
+.result-subtitle {
   color: var(--color-text-muted);
-  margin-top: 0.5rem;
+  font-size: 1rem;
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+.result-filename {
+  display: inline-block;
+  background: var(--color-bg-alt);
+  border-radius: var(--radius-full);
+  padding: 0.55rem 1.25rem;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
 }
 
 /* Result buttons */
@@ -390,7 +300,7 @@ input[type="file"] { display: none; }
 
 <div class="steps-bar">
   <div class="step-indicator active" id="ind1"><span class="step-num">1</span>Upload</div>
-  <div class="step-indicator" id="ind2"><span class="step-num">2</span><span id="step2Label">Annotate</span></div>
+  <div class="step-indicator" id="ind2"><span class="step-num">2</span>Processing</div>
   <div class="step-indicator" id="ind3"><span class="step-num">3</span>Result</div>
 </div>
 
@@ -411,79 +321,28 @@ input[type="file"] { display: none; }
   </div>
 </div>
 
-<!-- Step 2: Annotate (images) or Describe (documents) -->
-<div class="step" id="stepAnnotate">
-  <!-- Image layout: canvas + side controls -->
-  <div class="annotate-layout" id="imageLayout">
-    <div class="canvas-area">
-      <div class="canvas-wrapper" id="canvasWrapper">
-        <canvas id="annotCanvas"></canvas>
+<!-- Step 2: Processing -->
+<div class="step" id="stepProcessing">
+  <div class="processing-view">
+    <div class="processing-header">
+      <div class="file-info">
+        <span class="file-icon" id="fileIcon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </span>
+        <span class="file-name" id="fileName"></span>
+        <span class="file-size" id="fileSize"></span>
       </div>
-      <p class="canvas-hint" id="canvasHint">Draw a rectangle around the watermark, or let AI find it automatically.</p>
     </div>
-    <div class="controls-panel">
-      <div class="controls-card">
-        <div class="btn-row">
-          <button class="btn btn-secondary btn-sm" id="btnBackImage">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Back
-          </button>
-          <button class="btn btn-secondary btn-sm" id="btnClearRect" disabled>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            Clear Selection
-          </button>
-        </div>
-      </div>
-      <button class="btn btn-primary btn-full" id="btnAnalyzeImage">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        Analyze with AI
-      </button>
-      <div id="analysisResultImage"></div>
-      <div id="removeRowImage" style="display:none;">
-        <button class="btn btn-primary btn-full" id="btnRemoveImage">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>
-          Remove Watermark
-        </button>
-      </div>
-      <div class="status" id="statusImage"></div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"></div>
     </div>
-  </div>
-
-  <!-- Document layout: centered description form -->
-  <div class="describe-layout" id="docLayout" style="display:none;">
-    <div class="doc-card" id="docCard">
-      <div class="doc-icon">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      </div>
-      <p class="doc-name" id="docName"></p>
-      <p class="doc-size" id="docSize"></p>
-    </div>
-    <div class="describe-form">
-      <p class="input-help" style="margin-bottom: 0.5rem;">Each page will be analyzed and processed automatically.</p>
-      <div class="describe-actions">
-        <button class="btn btn-secondary" id="btnBackDoc">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-          Back
-        </button>
-        <button class="btn btn-primary" id="btnAnalyzeDoc">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          Analyze with AI
-        </button>
-      </div>
-      <div id="analysisResultDoc"></div>
-      <div id="removeRowDoc" style="display:none;">
-        <button class="btn btn-primary btn-full" id="btnRemoveDoc">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>
-          Remove Watermark
-        </button>
-      </div>
-      <div class="status" id="statusDoc"></div>
-    </div>
+    <div class="activity-feed" id="activityFeed"></div>
+    <div id="processingError"></div>
   </div>
 </div>
 
 <!-- Step 3: Result -->
-<div class="step" id="stepCompare">
+<div class="step" id="stepResult">
   <!-- Image result: before/after slider -->
   <div id="imageResult" style="display:none;">
     <div class="compare-container" id="compareContainer">
@@ -501,10 +360,6 @@ input[type="file"] { display: none; }
       <span class="compare-tag after-tag">After</span>
     </div>
     <div class="result-actions" style="margin-top:1.5rem;">
-      <button class="btn btn-secondary" id="btnRetry">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-        Try Again
-      </button>
       <button class="btn btn-secondary" id="btnRestart">Start Over</button>
       <button class="btn btn-primary" id="btnDownload">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -536,41 +391,28 @@ input[type="file"] { display: none; }
 <script>
 // State
 let uploadedFile = null;
-let drawnRect = null;
-let analysisData = null;
 let cleanBlob = null;
-let imgNatW = 0, imgNatH = 0;
-let isDrawing = false, startX = 0, startY = 0;
 let isImageFile = false;
+
+// SVG icons
+const checkSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+const imageSvg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+const docSvg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
 
 // Elements
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
-const canvas = document.getElementById('annotCanvas');
-const ctx = canvas.getContext('2d');
-const canvasHint = document.getElementById('canvasHint');
-const btnClearRect = document.getElementById('btnClearRect');
-const step2Label = document.getElementById('step2Label');
-const imageLayout = document.getElementById('imageLayout');
-const docLayout = document.getElementById('docLayout');
 const indicators = [document.getElementById('ind1'), document.getElementById('ind2'), document.getElementById('ind3')];
 const steps = {
   upload: document.getElementById('stepUpload'),
-  annotate: document.getElementById('stepAnnotate'),
-  compare: document.getElementById('stepCompare'),
+  processing: document.getElementById('stepProcessing'),
+  result: document.getElementById('stepResult'),
 };
-
-// Active desc/status/result elements depend on file type
-function getDescInput() { return { value: '' }; }
-function getLocInput() { return { value: '' }; }
-function getStatus() { return isImageFile ? document.getElementById('statusImage') : document.getElementById('statusDoc'); }
-function getAnalysisResult() { return isImageFile ? document.getElementById('analysisResultImage') : document.getElementById('analysisResultDoc'); }
-function getRemoveRow() { return isImageFile ? document.getElementById('removeRowImage') : document.getElementById('removeRowDoc'); }
 
 function showStep(name) {
   Object.values(steps).forEach(s => s.classList.remove('active'));
   steps[name].classList.add('active');
-  const idx = name === 'upload' ? 0 : name === 'annotate' ? 1 : 2;
+  const idx = name === 'upload' ? 0 : name === 'processing' ? 1 : 2;
   indicators.forEach((ind, i) => {
     ind.classList.remove('active', 'done');
     if (i < idx) ind.classList.add('done');
@@ -578,27 +420,19 @@ function showStep(name) {
   });
 }
 
-function setLoading(btn, loading) {
-  if (loading) {
-    btn._origHTML = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Processing\u2026';
-  } else {
-    btn.disabled = false;
-    if (btn._origHTML) btn.innerHTML = btn._origHTML;
-  }
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
 function showError(message) {
-  getStatus().innerHTML = '';
-  getAnalysisResult().innerHTML =
+  document.getElementById('processingError').innerHTML =
     '<div class="error-alert">' +
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' +
-    '<p>' + message + '</p></div>';
-}
-
-function updateClearButton() {
-  btnClearRect.disabled = !drawnRect;
+    '<p>' + message + '</p></div>' +
+    '<div class="result-actions" style="margin-top:1rem;">' +
+    '<button class="btn btn-secondary" onclick="doRestart()">Start Over</button></div>';
 }
 
 // Step 1: Upload
@@ -621,285 +455,99 @@ function handleFile() {
 
   isImageFile = /\\.(png|jpe?g|bmp|tiff|webp)$/i.test(uploadedFile.name);
 
-  if (isImageFile) {
-    step2Label.textContent = 'Annotate';
-    imageLayout.style.display = 'flex';
-    docLayout.style.display = 'none';
-    canvasHint.textContent = 'Draw a rectangle around the watermark, or let AI find it automatically.';
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = new Image();
-      img.onload = () => {
-        imgNatW = img.naturalWidth; imgNatH = img.naturalHeight;
-        const wrapper = document.getElementById('canvasWrapper');
-        const maxW = wrapper.clientWidth || 620;
-        const scale = Math.min(1, maxW / imgNatW);
-        canvas.width = Math.round(imgNatW * scale);
-        canvas.height = Math.round(imgNatH * scale);
-        canvas.dataset.scale = scale;
-        canvas.style.cursor = 'crosshair';
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        canvas.dataset.src = e.target.result;
-        showStep('annotate');
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(uploadedFile);
-  } else {
-    step2Label.textContent = 'Describe';
-    imageLayout.style.display = 'none';
-    docLayout.style.display = 'block';
-    document.getElementById('docName').textContent = uploadedFile.name;
-    document.getElementById('docSize').textContent = (uploadedFile.size / 1024 / 1024).toFixed(1) + ' MB';
-    showStep('annotate');
+  // Set up processing view
+  document.getElementById('fileName').textContent = uploadedFile.name;
+  document.getElementById('fileSize').textContent = formatFileSize(uploadedFile.size);
+  document.getElementById('fileIcon').innerHTML = isImageFile ? imageSvg : docSvg;
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('activityFeed').innerHTML = '';
+  document.getElementById('processingError').innerHTML = '';
+
+  showStep('processing');
+  doProcess();
+}
+
+// Activity feed helpers
+function addActivityItem(text, isActive) {
+  const feed = document.getElementById('activityFeed');
+
+  // Mark previous active item as done
+  var prev = feed.querySelector('.activity-item.active');
+  if (prev) {
+    prev.classList.remove('active');
+    prev.classList.add('done');
+    prev.querySelector('.activity-icon').innerHTML = checkSvg;
+  }
+
+  var item = document.createElement('div');
+  item.className = 'activity-item ' + (isActive ? 'active' : 'done');
+  item.innerHTML =
+    '<span class="activity-icon">' +
+    (isActive ? '<div class="spinner-sm"></div>' : checkSvg) +
+    '</span>' +
+    '<span class="activity-text">' + escapeHtml(text) + '</span>';
+  feed.appendChild(item);
+
+  // Auto-scroll to bottom
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function markAllDone() {
+  var feed = document.getElementById('activityFeed');
+  var active = feed.querySelector('.activity-item.active');
+  if (active) {
+    active.classList.remove('active');
+    active.classList.add('done');
+    active.querySelector('.activity-icon').innerHTML = checkSvg;
   }
 }
 
-// Canvas drawing (only for images)
-canvas.addEventListener('mousedown', e => {
-  if (!isImageFile) return;
-  isDrawing = true;
-  const r = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / r.width;
-  const scaleY = canvas.height / r.height;
-  startX = (e.clientX - r.left) * scaleX;
-  startY = (e.clientY - r.top) * scaleY;
-});
-canvas.addEventListener('mousemove', e => {
-  if (!isDrawing) return;
-  const r = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / r.width;
-  const scaleY = canvas.height / r.height;
-  const cx = (e.clientX - r.left) * scaleX;
-  const cy = (e.clientY - r.top) * scaleY;
-  redrawCanvas();
-  ctx.strokeStyle = '#0047ab'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
-  ctx.strokeRect(startX, startY, cx - startX, cy - startY);
-  ctx.setLineDash([]);
-});
-canvas.addEventListener('mouseup', e => {
-  if (!isDrawing) return;
-  isDrawing = false;
-  const r = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / r.width;
-  const scaleY = canvas.height / r.height;
-  const ex = (e.clientX - r.left) * scaleX;
-  const ey = (e.clientY - r.top) * scaleY;
-  const imgScale = parseFloat(canvas.dataset.scale) || 1;
-  const rx = Math.min(startX, ex) / imgScale;
-  const ry = Math.min(startY, ey) / imgScale;
-  const rw = Math.abs(ex - startX) / imgScale;
-  const rh = Math.abs(ey - startY) / imgScale;
-  if (rw > 5 && rh > 5) {
-    drawnRect = { x: Math.round(rx), y: Math.round(ry), w: Math.round(rw), h: Math.round(rh) };
-    redrawCanvas();
-    drawRect(drawnRect);
-    updateClearButton();
-  }
-});
-
-// Touch support
-canvas.addEventListener('touchstart', e => {
-  if (!isImageFile) return;
-  e.preventDefault();
-  const touch = e.touches[0];
-  canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: touch.clientX, clientY: touch.clientY }));
-}, { passive: false });
-canvas.addEventListener('touchmove', e => {
-  if (!isImageFile) return;
-  e.preventDefault();
-  const touch = e.touches[0];
-  canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: touch.clientX, clientY: touch.clientY }));
-}, { passive: false });
-canvas.addEventListener('touchend', e => {
-  if (!isImageFile) return;
-  const touch = e.changedTouches[0];
-  canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: touch.clientX, clientY: touch.clientY }));
-});
-
-function redrawCanvas() {
-  if (canvas.dataset.src) {
-    const img = new Image(); img.src = canvas.dataset.src;
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  }
-}
-function drawRect(r) {
-  const scale = parseFloat(canvas.dataset.scale) || 1;
-  const x = r.x * scale, y = r.y * scale, w = r.w * scale, h = r.h * scale;
-  ctx.fillStyle = 'rgba(0, 71, 171, 0.08)';
-  ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = '#0047ab'; ctx.lineWidth = 2; ctx.setLineDash([]);
-  ctx.strokeRect(x, y, w, h);
-  const hs = 4;
-  ctx.fillStyle = '#0047ab';
-  [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].forEach(([cx, cy]) => {
-    ctx.fillRect(cx - hs, cy - hs, hs * 2, hs * 2);
-  });
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
-btnClearRect.addEventListener('click', () => {
-  drawnRect = null; redrawCanvas(); updateClearButton();
-});
+// Process — streams NDJSON from /process
+async function doProcess() {
+  var fill = document.getElementById('progressFill');
+  fill.style.width = '2%';
+  addActivityItem('Starting processing...', true);
 
-// Back buttons
-document.getElementById('btnBackImage').addEventListener('click', goBack);
-document.getElementById('btnBackDoc').addEventListener('click', goBack);
-function goBack() {
-  drawnRect = null; analysisData = null;
-  getAnalysisResult().innerHTML = '';
-  getRemoveRow().style.display = 'none';
-  getStatus().textContent = '';
-  updateClearButton();
-  showStep('upload');
-}
-
-// Analyze — both layouts wire to the same logic
-document.getElementById('btnAnalyzeImage').addEventListener('click', doAnalyze);
-document.getElementById('btnAnalyzeDoc').addEventListener('click', doAnalyze);
-async function doAnalyze() {
-  const btn = isImageFile ? document.getElementById('btnAnalyzeImage') : document.getElementById('btnAnalyzeDoc');
-  setLoading(btn, true);
-  getStatus().className = 'status'; getStatus().textContent = '';
-  getAnalysisResult().innerHTML = '';
-
-  // Show analyzing feedback for documents
-  if (!isImageFile) {
-    getAnalysisResult().innerHTML =
-      '<div class="progress-panel">' +
-      '<div class="progress-label">Analyzing document</div>' +
-      '<div class="progress-track"><div class="progress-fill" style="width:40%;animation:pulse 1.5s ease-in-out infinite"></div></div>' +
-      '<div class="progress-status">Extracting first page and sending to AI for analysis\u2026</div>' +
-      '</div>' +
-      '<style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}</style>';
-  }
-
-  const fd = new FormData();
+  var fd = new FormData();
   fd.append('file', uploadedFile);
-  fd.append('description', getDescInput().value);
-  fd.append('location', getLocInput().value);
-  if (drawnRect) {
-    fd.append('region_x', drawnRect.x); fd.append('region_y', drawnRect.y);
-    fd.append('region_w', drawnRect.w); fd.append('region_h', drawnRect.h);
-  }
+
   try {
-    const resp = await fetch('/analyze', { method: 'POST', body: fd });
-    const data = await resp.json();
-    if (data.error) {
-      showError(data.error);
-    } else {
-      analysisData = data;
-      renderAnalysis(analysisData);
-      getRemoveRow().style.display = 'block';
-    }
-  } catch (err) {
-    showError('Could not reach the server. Check your connection and try again.');
-  }
-  setLoading(btn, false);
-}
-
-function renderAnalysis(a) {
-  if (a.watermark_found && a.region && isImageFile) {
-    redrawCanvas();
-    drawRect({ x: a.region.x, y: a.region.y, w: a.region.width, h: a.region.height });
-  }
-  const stratLabels = { solid_fill: 'Solid Fill', gradient_fill: 'Gradient Fill', clone_stamp: 'Clone Stamp', inpaint: 'LaMa Inpaint' };
-  const bgLabels = { solid_color: 'Solid Color', gradient: 'Gradient', simple_texture: 'Simple Texture', complex_content: 'Complex', mixed: 'Mixed' };
-  const conf = a.confidence || 0;
-  const confClass = conf >= 0.75 ? 'confidence-high' : conf >= 0.4 ? 'confidence-mid' : 'confidence-low';
-
-  getAnalysisResult().innerHTML = a.watermark_found ? `
-    <div class="analysis-card">
-      <h3>Watermark Detected</h3>
-      <div class="analysis-grid">
-        <div class="analysis-item">
-          <div class="analysis-label">Background</div>
-          <div class="analysis-value">${bgLabels[a.background_type] || a.background_type}</div>
-        </div>
-        <div class="analysis-item">
-          <div class="analysis-label">Strategy</div>
-          <div class="analysis-value">${stratLabels[a.strategy] || a.strategy}</div>
-        </div>
-        <div class="analysis-item">
-          <div class="analysis-label">Confidence</div>
-          <div class="analysis-value">${Math.round(conf * 100)}%</div>
-          <div class="confidence-bar"><div class="confidence-fill ${confClass}" style="width:${conf * 100}%"></div></div>
-        </div>
-        <div class="analysis-item">
-          <div class="analysis-label">Description</div>
-          <div class="analysis-value">${a.description || '\u2014'}</div>
-        </div>
-        ${a.reasoning ? `<div class="reasoning">${a.reasoning}</div>` : ''}
-      </div>
-    </div>` : `
-    <div class="analysis-card">
-      <h3>No Watermark Found</h3>
-      <p style="color:var(--color-text-muted);font-size:0.82rem;">Try adding a description of the watermark.</p>
-    </div>`;
-}
-
-// Remove — both layouts (streaming progress)
-document.getElementById('btnRemoveImage').addEventListener('click', doRemove);
-document.getElementById('btnRemoveDoc').addEventListener('click', doRemove);
-
-function showProgress(message, pct) {
-  const container = getAnalysisResult();
-  let panel = container.querySelector('.progress-panel');
-  if (!panel) {
-    container.innerHTML =
-      '<div class="progress-panel">' +
-      '<div class="progress-label">Removing watermark</div>' +
-      '<div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>' +
-      '<div class="progress-status" id="progressStatus"></div>' +
-      '</div>';
-    panel = container.querySelector('.progress-panel');
-  }
-  const fill = document.getElementById('progressFill');
-  const status = document.getElementById('progressStatus');
-  if (fill) fill.style.width = pct + '%';
-  if (status) status.textContent = message;
-}
-
-async function doRemove() {
-  const btn = isImageFile ? document.getElementById('btnRemoveImage') : document.getElementById('btnRemoveDoc');
-  setLoading(btn, true);
-  getStatus().className = 'status'; getStatus().textContent = '';
-  showProgress('Starting\u2026', 2);
-
-  const fd = new FormData();
-  fd.append('file', uploadedFile);
-  fd.append('description', getDescInput().value);
-  fd.append('location', getLocInput().value);
-  if (drawnRect) {
-    fd.append('region_x', drawnRect.x); fd.append('region_y', drawnRect.y);
-    fd.append('region_w', drawnRect.w); fd.append('region_h', drawnRect.h);
-  }
-  try {
-    const resp = await fetch('/process', { method: 'POST', body: fd });
+    var resp = await fetch('/process', { method: 'POST', body: fd });
     if (!resp.ok) {
-      const data = await resp.json().catch(() => null);
-      throw new Error(data?.error || 'Processing failed. Please try again.');
+      var data = await resp.json().catch(function() { return null; });
+      throw new Error(data && data.error ? data.error : 'Processing failed. Please try again.');
     }
 
     // Read the NDJSON stream line by line
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let downloadToken = null;
+    var reader = resp.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+    var downloadToken = null;
 
     while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\\n');
+      var result = await reader.read();
+      if (result.done) break;
+      buffer += decoder.decode(result.value, { stream: true });
+      var lines = buffer.split('\\n');
       buffer = lines.pop();
-      for (const line of lines) {
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
         if (!line.trim()) continue;
-        const evt = JSON.parse(line);
+        var evt = JSON.parse(line);
         if (evt.type === 'progress') {
-          showProgress(evt.message, evt.pct);
+          fill.style.width = evt.pct + '%';
+          addActivityItem(evt.message, true);
         } else if (evt.type === 'complete') {
           downloadToken = evt.download_token;
-          showProgress('Done', 100);
+          fill.style.width = '100%';
+          markAllDone();
+          addActivityItem('Processing complete', false);
         } else if (evt.type === 'error') {
           throw new Error(evt.message);
         }
@@ -909,97 +557,95 @@ async function doRemove() {
     if (!downloadToken) throw new Error('Processing completed but no download available.');
 
     // Download the result
-    showProgress('Downloading result\u2026', 100);
-    const dlResp = await fetch('/download/' + downloadToken);
+    addActivityItem('Downloading result...', true);
+    var dlResp = await fetch('/download/' + downloadToken);
     if (!dlResp.ok) throw new Error('Download failed.');
     cleanBlob = await dlResp.blob();
-    showCompare();
+    markAllDone();
+
+    showResult();
   } catch (err) {
-    getStatus().className = 'status error';
-    getStatus().textContent = err.message;
+    markAllDone();
+    showError(err.message);
   }
-  setLoading(btn, false);
 }
 
 // Result
-function showCompare() {
+function showResult() {
   if (!isImageFile) {
     // Document: show success card
     document.getElementById('imageResult').style.display = 'none';
     document.getElementById('docResult').style.display = 'block';
     document.getElementById('resultFilename').textContent = 'clean_' + uploadedFile.name;
-    showStep('compare');
+    showStep('result');
     return;
   }
   // Image: show before/after slider
   document.getElementById('imageResult').style.display = 'block';
   document.getElementById('docResult').style.display = 'none';
-  const beforeUrl = URL.createObjectURL(uploadedFile);
-  const afterUrl = URL.createObjectURL(cleanBlob);
-  const beforeImg = document.getElementById('imgBefore');
-  const afterImg = document.getElementById('imgAfter');
+  var beforeUrl = URL.createObjectURL(uploadedFile);
+  var afterUrl = URL.createObjectURL(cleanBlob);
+  var beforeImg = document.getElementById('imgBefore');
+  var afterImg = document.getElementById('imgAfter');
   beforeImg.src = beforeUrl;
   afterImg.src = afterUrl;
-  beforeImg.onload = () => {
+  beforeImg.onload = function() {
     afterImg.style.width = beforeImg.clientWidth + 'px';
-    showStep('compare');
+    showStep('result');
     initCompareSlider();
   };
 }
 
 function initCompareSlider() {
-  const container = document.getElementById('compareContainer');
-  const afterDiv = document.getElementById('compareAfter');
-  const handle = document.getElementById('compareHandle');
-  let isDragging = false;
+  var container = document.getElementById('compareContainer');
+  var afterDiv = document.getElementById('compareAfter');
+  var handle = document.getElementById('compareHandle');
+  var isDragging = false;
 
   function setPosition(clientX) {
-    const rect = container.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    var rect = container.getBoundingClientRect();
+    var pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     afterDiv.style.width = (pct * 100) + '%';
     handle.style.left = (pct * 100) + '%';
   }
 
-  requestAnimationFrame(() => {
-    const rect = container.getBoundingClientRect();
+  requestAnimationFrame(function() {
+    var rect = container.getBoundingClientRect();
     setPosition(rect.left + rect.width / 2);
   });
 
-  handle.addEventListener('mousedown', e => { isDragging = true; e.preventDefault(); });
-  document.addEventListener('mousemove', e => { if (isDragging) setPosition(e.clientX); });
-  document.addEventListener('mouseup', () => isDragging = false);
-  container.addEventListener('click', e => setPosition(e.clientX));
+  handle.addEventListener('mousedown', function(e) { isDragging = true; e.preventDefault(); });
+  document.addEventListener('mousemove', function(e) { if (isDragging) setPosition(e.clientX); });
+  document.addEventListener('mouseup', function() { isDragging = false; });
+  container.addEventListener('click', function(e) { setPosition(e.clientX); });
 
-  handle.addEventListener('touchstart', e => { isDragging = true; e.preventDefault(); }, { passive: false });
-  document.addEventListener('touchmove', e => { if (isDragging) setPosition(e.touches[0].clientX); });
-  document.addEventListener('touchend', () => isDragging = false);
+  handle.addEventListener('touchstart', function(e) { isDragging = true; e.preventDefault(); }, { passive: false });
+  document.addEventListener('touchmove', function(e) { if (isDragging) setPosition(e.touches[0].clientX); });
+  document.addEventListener('touchend', function() { isDragging = false; });
 }
 
-document.getElementById('btnDownload').addEventListener('click', triggerDownload);
 function triggerDownload() {
-  const url = URL.createObjectURL(cleanBlob);
-  const a = document.createElement('a');
+  var url = URL.createObjectURL(cleanBlob);
+  var a = document.createElement('a');
   a.href = url; a.download = 'clean_' + uploadedFile.name; a.click();
   URL.revokeObjectURL(url);
 }
 
+document.getElementById('btnDownload').addEventListener('click', triggerDownload);
 document.getElementById('btnDownloadDoc').addEventListener('click', triggerDownload);
-document.getElementById('btnRetry').addEventListener('click', () => { showStep('annotate'); });
 
 function doRestart() {
-  uploadedFile = null; drawnRect = null; analysisData = null; cleanBlob = null;
+  uploadedFile = null; cleanBlob = null;
   isImageFile = false;
   fileInput.value = '';
-  document.getElementById('analysisResultImage').innerHTML = '';
-  document.getElementById('analysisResultDoc').innerHTML = '';
-  document.getElementById('removeRowImage').style.display = 'none';
-  document.getElementById('removeRowDoc').style.display = 'none';
-  document.getElementById('statusImage').textContent = '';
-  document.getElementById('statusDoc').textContent = '';
-  updateClearButton();
+  document.getElementById('activityFeed').innerHTML = '';
+  document.getElementById('processingError').innerHTML = '';
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('imageResult').style.display = 'none';
+  document.getElementById('docResult').style.display = 'none';
   showStep('upload');
 }
 document.getElementById('btnRestart').addEventListener('click', doRestart);
 document.getElementById('btnRestartDoc').addEventListener('click', doRestart);
 </script>
-""", active_nav="app", description="Upload an image, PDF, or PPTX to remove watermarks with AI. Draw a selection, let AI detect, and download your clean file instantly.", canonical_path="/app")
+""", active_nav="app", description="Upload an image, PDF, or PPTX to remove watermarks with AI. Drop a file, watch AI process it in real time, and download your clean file instantly.", canonical_path="/app")
