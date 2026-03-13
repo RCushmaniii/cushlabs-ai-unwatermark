@@ -61,10 +61,14 @@ def process_pdf(
     baseline_analysis: WatermarkAnalysis | None = None
 
     for page_idx in range(page_count):
-        pct = int(5 + (page_idx / page_count) * 90)
+        page_num = page_idx + 1
+        # Each page gets a slice of the 5-93% progress range
+        page_start_pct = int(5 + (page_idx / page_count) * 88)
+        page_end_pct = int(5 + ((page_idx + 1) / page_count) * 88)
+
         if on_progress:
             on_progress(
-                f"Processing page {page_idx + 1} of {page_count}\u2026", pct
+                f"Page {page_num}/{page_count}: rendering...", page_start_pct
             )
 
         page = src_doc[page_idx]
@@ -72,13 +76,36 @@ def process_pdf(
 
         image = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
 
+        # Create a sub-progress callback that prefixes messages with page info
+        # and maps clean_image's 10-95% range into this page's slice
+        def _make_page_progress(pg_num: int, pg_total: int, start: int, end: int):
+            def _page_progress(msg: str, inner_pct: int) -> None:
+                if on_progress:
+                    # Map inner_pct (10-95) into our page's range (start-end)
+                    scaled = start + int((inner_pct - 10) / 85 * (end - start))
+                    scaled = max(start, min(end, scaled))
+                    on_progress(f"Page {pg_num}/{pg_total}: {msg}", scaled)
+            return _page_progress
+
+        page_progress = _make_page_progress(page_num, page_count, page_start_pct, page_end_pct) if on_progress else None
+
         result = clean_image(
             image, config, annotation, force_strategy,
             baseline=baseline_analysis,
+            on_progress=page_progress,
         )
 
         if baseline_analysis is None and result.first_analysis is not None:
             baseline_analysis = result.first_analysis
+
+        if on_progress:
+            if result.removed > 0:
+                on_progress(
+                    f"Page {page_num}/{page_count}: removed {result.removed} watermark{'s' if result.removed != 1 else ''}",
+                    page_end_pct,
+                )
+            else:
+                on_progress(f"Page {page_num}/{page_count}: clean", page_end_pct)
 
         cleaned = result.image.convert("RGB")
 
@@ -93,7 +120,7 @@ def process_pdf(
         img_doc.close()
 
     if on_progress:
-        on_progress("Assembling PDF\u2026", 95)
+        on_progress("Assembling PDF...", 95)
 
     out_doc.save(str(output_path))
     out_doc.close()

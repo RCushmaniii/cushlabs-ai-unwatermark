@@ -62,11 +62,15 @@ def process_pptx(
     baseline_analysis: WatermarkAnalysis | None = None
 
     for slide_idx, slide in enumerate(prs.slides):
-        pct = int(5 + (slide_idx / slide_count) * 90)
+        slide_num = slide_idx + 1
+        # Each slide gets a slice of the 5-93% progress range
+        slide_start_pct = int(5 + (slide_idx / slide_count) * 88)
+        slide_end_pct = int(5 + ((slide_idx + 1) / slide_count) * 88)
+
         if on_progress:
             on_progress(
-                f"Processing slide {slide_idx + 1} of {slide_count}\u2026",
-                pct,
+                f"Slide {slide_num}/{slide_count}: scanning for watermarks...",
+                slide_start_pct,
             )
 
         for shape in slide.shapes:
@@ -82,30 +86,52 @@ def process_pptx(
             content_type = image_wrapper.content_type
             image = Image.open(io.BytesIO(image_bytes))
             logger.info(
-                f"Slide {slide_idx + 1}: found image {image.width}x{image.height} "
+                f"Slide {slide_num}: found image {image.width}x{image.height} "
                 f"({content_type})"
             )
+
+            # Create a sub-progress callback that prefixes messages with slide info
+            # and maps clean_image's 10-95% range into this slide's slice
+            def _make_slide_progress(s_num: int, s_total: int, start: int, end: int):
+                def _slide_progress(msg: str, inner_pct: int) -> None:
+                    if on_progress:
+                        # Map inner_pct (10-95) into our slide's range (start-end)
+                        scaled = start + int((inner_pct - 10) / 85 * (end - start))
+                        scaled = max(start, min(end, scaled))
+                        on_progress(f"Slide {s_num}/{s_total}: {msg}", scaled)
+                return _slide_progress
+
+            slide_progress = _make_slide_progress(slide_num, slide_count, slide_start_pct, slide_end_pct) if on_progress else None
 
             # Multi-pass: detect and remove all watermarks on this slide
             result = clean_image(
                 image, config, annotation, force_strategy,
                 baseline=baseline_analysis,
+                on_progress=slide_progress,
             )
 
             if result.removed == 0:
-                logger.info(f"Slide {slide_idx + 1}: no watermarks removed")
+                logger.info(f"Slide {slide_num}: no watermarks removed")
+                if on_progress:
+                    on_progress(f"Slide {slide_num}/{slide_count}: clean", slide_end_pct)
                 continue
 
             logger.info(
-                f"Slide {slide_idx + 1}: removed {result.removed} watermark(s)"
+                f"Slide {slide_num}: removed {result.removed} watermark(s)"
             )
+
+            if on_progress:
+                on_progress(
+                    f"Slide {slide_num}/{slide_count}: removed {result.removed} watermark{'s' if result.removed != 1 else ''}",
+                    slide_end_pct,
+                )
 
             # Save first successful detection as baseline for future slides
             if baseline_analysis is None and result.first_analysis is not None:
                 baseline_analysis = result.first_analysis
                 r = baseline_analysis.region
                 logger.info(
-                    f"Slide {slide_idx + 1}: saved baseline "
+                    f"Slide {slide_num}: saved baseline "
                     f"({r.x},{r.y},{r.width}x{r.height})"
                 )
 
@@ -124,13 +150,13 @@ def process_pptx(
                 new_blob = buf.getvalue()
                 actual_part._blob = new_blob
                 logger.info(
-                    f"Slide {slide_idx + 1}: replaced blob ({len(new_blob)} bytes)"
+                    f"Slide {slide_num}: replaced blob ({len(new_blob)} bytes)"
                 )
             else:
-                logger.warning(f"Slide {slide_idx + 1}: image part not found")
+                logger.warning(f"Slide {slide_num}: image part not found")
 
     if on_progress:
-        on_progress("Saving presentation\u2026", 95)
+        on_progress("Saving presentation...", 95)
 
     prs.save(str(output_path))
 

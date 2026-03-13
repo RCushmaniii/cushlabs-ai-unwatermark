@@ -34,20 +34,20 @@ def process_image(
         Path to the output file.
     """
     if on_progress:
-        on_progress("Analyzing image for watermarks\u2026", 10)
+        on_progress("Loading image...", 5)
 
     image = Image.open(input_path)
 
-    if on_progress:
-        on_progress("Removing watermarks\u2026", 30)
-
-    result = clean_image(image, config, annotation, force_strategy)
+    result = clean_image(
+        image, config, annotation, force_strategy,
+        on_progress=on_progress,
+    )
 
     if output_path.suffix.lower() in (".jpg", ".jpeg"):
         result.image = result.image.convert("RGB")
 
     if on_progress:
-        on_progress("Saving cleaned image\u2026", 90)
+        on_progress("Saving cleaned image...", 97)
 
     result.image.save(output_path, quality=95)
 
