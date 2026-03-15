@@ -27,6 +27,7 @@ class RemovalStrategy(str, Enum):
     GRADIENT_FILL = "gradient_fill"
     CLONE_STAMP = "clone_stamp"
     INPAINT = "inpaint"
+    ALPHA_SUBTRACT = "alpha_subtract"
 
     @classmethod
     def from_background(cls, bg: BackgroundType) -> RemovalStrategy:

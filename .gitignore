@@ -57,3 +57,5 @@ Desktop.ini
 uploads/
 output/
 *.tmp
+test_output/
+debug_output/

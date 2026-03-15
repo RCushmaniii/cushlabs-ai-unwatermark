@@ -75,14 +75,20 @@ def detect_watermark_florence(
 
     # Strategy 1: Caption to Phrase Grounding
     # First get a caption, then ground "watermark" in it
-    result = _try_grounding(client, img_uri, img_w, img_h, max_bbox_percent, detection_prompt)
+    api_errors = []
+    result = _try_grounding(client, img_uri, img_w, img_h, max_bbox_percent, detection_prompt, api_errors)
     if result is not None:
         return result
 
     # Strategy 2: OCR with Region — find text and check against watermark patterns
-    result = _try_ocr_with_region(client, img_uri, img_w, img_h, max_bbox_percent, detection_prompt)
+    result = _try_ocr_with_region(client, img_uri, img_w, img_h, max_bbox_percent, detection_prompt, api_errors)
     if result is not None:
         return result
+
+    # If API calls failed (not just "no watermark found"), raise so the
+    # circuit breaker in detector.py can disable Florence-2 for this session.
+    if api_errors:
+        raise RuntimeError(f"Florence-2 API errors: {api_errors[0]}")
 
     logger.info("Florence-2: no watermarks detected")
     return None
@@ -91,6 +97,7 @@ def detect_watermark_florence(
 def _try_grounding(
     client, img_uri: str, img_w: int, img_h: int,
     max_bbox_percent: float, custom_prompt: str | None,
+    api_errors: list | None = None,
 ) -> WatermarkAnalysis | None:
     """Try Caption to Phrase Grounding to find watermark regions."""
     try:
@@ -136,12 +143,15 @@ def _try_grounding(
 
     except Exception as e:
         logger.warning(f"Florence-2 grounding failed: {e}")
+        if api_errors is not None:
+            api_errors.append(str(e))
         return None
 
 
 def _try_ocr_with_region(
     client, img_uri: str, img_w: int, img_h: int,
     max_bbox_percent: float, custom_prompt: str | None,
+    api_errors: list | None = None,
 ) -> WatermarkAnalysis | None:
     """Try OCR with Region to find text watermarks Florence might catch that EasyOCR missed."""
     try:
@@ -158,6 +168,8 @@ def _try_ocr_with_region(
 
     except Exception as e:
         logger.warning(f"Florence-2 OCR failed: {e}")
+        if api_errors is not None:
+            api_errors.append(str(e))
         return None
 
 

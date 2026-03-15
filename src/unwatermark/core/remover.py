@@ -10,7 +10,7 @@ from unwatermark.config import Config
 from unwatermark.core.strategies import select_strategy
 from unwatermark.core.techniques import get_technique
 from unwatermark.core.techniques.lama_inpaint import is_lama_available
-from unwatermark.models.analysis import WatermarkAnalysis
+from unwatermark.models.analysis import RemovalStrategy, WatermarkAnalysis
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +45,35 @@ def remove_watermark(
         inpaint_available=is_lama_available(),
     )
 
-    technique = get_technique(strategy, config)
+    # Auto-select alpha subtraction for large semi-transparent overlays.
+    # When the watermark region covers >5% of the image area, it's likely
+    # a semi-transparent overlay (diagonal SAMPLE PREVIEW, large Shutterstock)
+    # that alpha subtraction handles better than inpainting.
     r = analysis.region
+    if strategy == RemovalStrategy.INPAINT and force_strategy is None:
+        img_area = image.width * image.height
+        wm_area = r.width * r.height
+        coverage = wm_area / img_area if img_area > 0 else 0
+        desc_lower = (analysis.description or "").lower()
+        # Keywords alone aren't enough — require minimum 3% coverage to avoid
+        # routing tiny corner watermarks to alpha subtraction.
+        has_overlay_keywords = (
+            "diagonal" in desc_lower
+            or "semi-transparent" in desc_lower
+            or "faint" in desc_lower
+        )
+        is_likely_overlay = (
+            coverage > 0.05
+            or (has_overlay_keywords and coverage > 0.03)
+        )
+        if is_likely_overlay:
+            logger.info(
+                f"Auto-switching to alpha subtraction: "
+                f"coverage={coverage:.1%}, desc='{analysis.description[:60]}'"
+            )
+            strategy = RemovalStrategy.ALPHA_SUBTRACT
+
+    technique = get_technique(strategy, config)
     logger.info(
         f"Removing watermark: strategy={strategy.value}, technique={technique.name}, "
         f"region=({r.x},{r.y},{r.width}x{r.height}), image={image.width}x{image.height}"

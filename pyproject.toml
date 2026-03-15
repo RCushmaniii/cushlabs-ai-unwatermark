@@ -36,9 +36,9 @@ inpaint = [
 replicate = [
     "replicate>=0.25",
 ]
-# Lightweight deploy: web + replicate only (no PyTorch, fits in 512MB RAM)
+# Lightweight deploy: web + replicate + openai (no PyTorch, fits in 512MB RAM)
 deploy = [
-    "unwatermark[web,replicate]",
+    "unwatermark[web,replicate,openai]",
 ]
 # Full local install: everything including local ML models
 all = [

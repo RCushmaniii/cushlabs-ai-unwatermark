@@ -107,8 +107,14 @@ def detect_watermark_ocr(
         Returns None (not watermark_found=False) so the caller knows to try AI detection.
     """
     reader = _get_reader()
-    img_array = np.array(image.convert("RGB"))
     img_w, img_h = image.size
+
+    # Boost contrast before OCR — semi-transparent watermarks are too faint
+    # for EasyOCR at normal contrast (5-15 levels on 0-255).
+    # 3x enhancement makes watermark text readable without hurting content text.
+    from PIL import ImageEnhance
+    enhanced = ImageEnhance.Contrast(image).enhance(3.0)
+    img_array = np.array(enhanced.convert("RGB"))
 
     # EasyOCR returns list of (bbox, text, confidence)
     # bbox is [[x1,y1], [x2,y1], [x2,y2], [x1,y2]] (polygon corners)
@@ -216,6 +222,55 @@ def _is_watermark_text(text: str, known_text: str | None = None) -> bool:
     # Check against known watermark patterns
     for pattern in _WATERMARK_PATTERNS:
         if re.search(pattern, lower):
+            return True
+
+    # Fuzzy match against known brand names — OCR often garbles watermark text
+    # because watermarks are semi-transparent. "Shutteri OEL:" → "shutterstock"
+    if _fuzzy_brand_match(lower):
+        return True
+
+    return False
+
+
+# Brand names for fuzzy matching — ONLY long names (8+ chars) to avoid
+# false positives where random content words match short brands.
+# Short brands (getty, istock, canva, alamy, etc.) are already handled
+# by exact regex patterns above.
+_KNOWN_BRANDS = [
+    "shutterstock", "gettyimages", "istockphoto", "adobestock",
+    "dreamstime", "depositphotos", "notebooklm",
+]
+
+
+def _fuzzy_brand_match(text: str, threshold: float = 0.65) -> bool:
+    """Check if garbled OCR text is close enough to a known watermark brand.
+
+    Uses character overlap ratio — what fraction of the brand's characters
+    appear in the OCR text (order-independent). Handles OCR garbling like
+    "Shutteri OEL:" -> "shutterstock" (overlap ratio ~0.7).
+    """
+    # Remove non-alphanumeric to normalize OCR artifacts
+    cleaned = re.sub(r"[^a-z0-9]", "", text)
+    if len(cleaned) < 3:
+        return False
+
+    for brand in _KNOWN_BRANDS:
+        # Skip if lengths are too different (not the same word)
+        if abs(len(cleaned) - len(brand)) > max(len(brand) * 0.4, 3):
+            continue
+
+        # Character overlap: how many of the brand's characters appear in the OCR text
+        brand_chars = list(brand)
+        text_chars = list(cleaned)
+        matches = 0
+        for c in brand_chars:
+            if c in text_chars:
+                matches += 1
+                text_chars.remove(c)  # each char only counts once
+
+        overlap = matches / len(brand)
+        if overlap >= threshold:
+            logger.debug(f"Fuzzy brand match: '{text}' -> '{brand}' (overlap={overlap:.2f})")
             return True
 
     return False

@@ -28,6 +28,10 @@ def get_technique(strategy: RemovalStrategy, config: Config | None = None) -> Re
     if strategy == RemovalStrategy.INPAINT:
         return _get_inpaint_technique(config)
 
+    if strategy == RemovalStrategy.ALPHA_SUBTRACT:
+        from unwatermark.core.techniques.alpha_subtract import AlphaSubtractTechnique
+        return AlphaSubtractTechnique()
+
     raise ValueError(f"Unknown strategy: {strategy}")
 
 

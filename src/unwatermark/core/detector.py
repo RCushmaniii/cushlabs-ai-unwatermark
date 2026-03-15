@@ -13,7 +13,7 @@ import logging
 
 from PIL import Image
 
-from unwatermark.config import Config
+from unwatermark.config import AnalysisProvider, Config
 from unwatermark.core.analyzer import _heuristic_fallback, analyze_watermark
 from unwatermark.core.florence_detector import detect_watermark_florence
 from unwatermark.models.analysis import WatermarkAnalysis
@@ -28,6 +28,10 @@ except ImportError:
     _HAS_EASYOCR = False
 
 logger = logging.getLogger(__name__)
+
+# Circuit breaker: after Florence-2 fails once, skip it for the rest of the session.
+# Avoids wasting 10+ seconds per slide on repeated Replicate API errors.
+_florence_disabled = False
 
 
 def detect_watermark(
@@ -73,7 +77,8 @@ def detect_watermark(
         logger.info("EasyOCR not installed — skipping to Florence-2")
 
     # Layer 2: Florence-2 via Replicate (cheap, fast, handles visual watermarks)
-    if config.has_replicate_token:
+    global _florence_disabled
+    if config.has_replicate_token and not _florence_disabled:
         try:
             detection_prompt = None
             if annotation and annotation.has_description:
@@ -90,14 +95,69 @@ def detect_watermark(
                     f"confidence={florence_result.confidence}"
                 )
                 return florence_result
-            logger.info("Florence-2 found no watermark — trying legacy AI")
+            logger.info("Florence-2 found no watermark — trying AI Vision")
         except Exception as e:
-            logger.warning(f"Florence-2 detection failed: {e} — trying legacy AI")
+            logger.warning(f"Florence-2 failed: {e} — disabling for this session")
+            _florence_disabled = True
 
-    # Layer 3: Claude/GPT-4o Vision (legacy fallback — expensive, non-deterministic)
+    # Layer 3: AI Vision — try primary provider, then fallback to secondary
     if config.use_ai and config.can_use_ai:
-        logger.info("Using Claude/GPT-4o Vision (legacy fallback)")
-        return analyze_watermark(image, config, annotation)
+        logger.info(f"Using {config.analysis_provider.value} Vision")
+        primary_result = analyze_watermark(image, config, annotation)
+
+        # If primary provider found a watermark, use it
+        if primary_result.watermark_found:
+            return primary_result
+
+        # If primary says no watermark AND isn't very confident, try the OTHER
+        # provider as second opinion. Skip if primary is confident (>= 0.85) —
+        # the secondary can hallucinate watermarks on clean images.
+        if (
+            config.analysis_provider == AnalysisProvider.CLAUDE
+            and config.has_openai_key
+            and primary_result.confidence < 0.85
+        ):
+            logger.info("Claude found no watermark — trying GPT-4o as second opinion")
+            from unwatermark.config import Config as _Cfg
+            secondary_config = _Cfg(
+                openai_api_key=config.openai_api_key,
+                analysis_provider=AnalysisProvider.OPENAI,
+                analysis_model="gpt-4o",
+                use_ai=True,
+            )
+            try:
+                secondary_result = analyze_watermark(image, secondary_config, annotation)
+                if secondary_result.watermark_found:
+                    logger.info(
+                        f"GPT-4o found watermark: '{secondary_result.description}'"
+                    )
+                    return secondary_result
+            except Exception as e:
+                logger.warning(f"GPT-4o fallback failed: {e}")
+        elif (
+            config.analysis_provider == AnalysisProvider.OPENAI
+            and config.has_anthropic_key
+            and primary_result.confidence < 0.85
+        ):
+            logger.info("GPT-4o found no watermark — trying Claude as second opinion")
+            from unwatermark.config import Config as _Cfg
+            secondary_config = _Cfg(
+                anthropic_api_key=config.anthropic_api_key,
+                analysis_provider=AnalysisProvider.CLAUDE,
+                analysis_model="claude-sonnet-4-20250514",
+                use_ai=True,
+            )
+            try:
+                secondary_result = analyze_watermark(image, secondary_config, annotation)
+                if secondary_result.watermark_found:
+                    logger.info(
+                        f"Claude found watermark: '{secondary_result.description}'"
+                    )
+                    return secondary_result
+            except Exception as e:
+                logger.warning(f"Claude fallback failed: {e}")
+
+        return primary_result
 
     # Layer 4: Heuristic fallback
     return _heuristic_fallback(image, annotation)

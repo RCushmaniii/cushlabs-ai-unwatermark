@@ -271,6 +271,10 @@ async def process_file(
     )
     config = load_config()
     force_strategy = strategy if strategy else None
+
+    # Reset Florence-2 circuit breaker for each new upload
+    import unwatermark.core.detector as _det
+    _det._florence_disabled = False
     output_path = input_path.with_stem(input_path.stem + "_clean")
     original_filename = file.filename or "file"
 

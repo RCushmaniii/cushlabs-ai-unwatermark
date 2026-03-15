@@ -21,7 +21,7 @@ from PIL import Image
 from unwatermark.config import Config
 from unwatermark.core.detector import detect_watermark
 from unwatermark.core.remover import remove_watermark
-from unwatermark.models.analysis import WatermarkAnalysis
+from unwatermark.models.analysis import RemovalStrategy, WatermarkAnalysis, WatermarkRegion
 from unwatermark.models.annotation import UserAnnotation
 
 if TYPE_CHECKING:
@@ -122,11 +122,28 @@ def clean_image(
                 break
 
         if not analysis.watermark_found:
-            # If first pass finds nothing but we have a baseline, use it
+            # Baseline is only useful for SAME watermark in SAME position across
+            # slides (e.g., NotebookLM watermark at bottom-right on every slide).
+            # Only apply if the baseline covers a small region (<10% of image) —
+            # large baselines (diagonal overlays, tiled patterns) are too
+            # slide-specific to reuse.
             if pass_num == 1 and baseline is not None:
-                logger.info(f"Pass {pass_num}: no watermark found, using baseline")
-                analysis = baseline
-                _emit(on_progress, f"Using baseline: '{analysis.description}'", pass_base_pct + 5)
+                br = baseline.region
+                img_area = current.width * current.height
+                baseline_coverage = (br.width * br.height) / img_area if img_area > 0 else 1.0
+                if baseline_coverage < 0.10:
+                    logger.info(
+                        f"Pass {pass_num}: no watermark found, using baseline "
+                        f"(coverage={baseline_coverage:.1%})"
+                    )
+                    analysis = baseline
+                    _emit(on_progress, f"Using baseline: '{analysis.description}'", pass_base_pct + 5)
+                else:
+                    logger.info(
+                        f"Pass {pass_num}: no watermark found, baseline too large "
+                        f"to reuse (coverage={baseline_coverage:.1%})"
+                    )
+                    break
             else:
                 logger.info(f"Pass {pass_num}: no more watermarks found — done")
                 break
@@ -182,6 +199,32 @@ def clean_image(
             gc.collect()
         else:
             logger.info("Final pass: no additional watermarks found")
+
+    # Stock photo tiled watermark cleanup: if we detected a stock photo brand
+    # (Shutterstock, Getty, etc.), the visible corner text is just the tip —
+    # there's usually a repeating semi-transparent watermark pattern across
+    # the entire image. Run alpha subtraction on the full image to remove it.
+    _STOCK_BRANDS = ["shutterstock", "getty", "istock", "dreamstime", "123rf",
+                     "alamy", "depositphoto", "fotolia", "bigstock", "adobe stock"]
+    if removed > 0 and first_analysis is not None:
+        desc_lower = (first_analysis.description or "").lower()
+        is_stock = any(brand in desc_lower for brand in _STOCK_BRANDS)
+        if is_stock:
+            _emit(on_progress, "Removing tiled watermark pattern...", 90)
+            logger.info("Stock photo detected — applying full-image alpha subtraction for tiled pattern")
+            full_region = WatermarkRegion(x=0, y=0, width=current.width, height=current.height)
+            tiled_analysis = WatermarkAnalysis(
+                watermark_found=True,
+                region=full_region,
+                description=f"Tiled {first_analysis.description}",
+                strategy=RemovalStrategy.ALPHA_SUBTRACT,
+                confidence=0.7,
+            )
+            from unwatermark.core.techniques.alpha_subtract import AlphaSubtractTechnique
+            technique = AlphaSubtractTechnique()
+            current = technique.remove(current, full_region, tiled_analysis)
+            removed += 1
+            gc.collect()
 
     if removed > 1:
         logger.info(f"Multi-pass complete: removed {removed} watermarks")

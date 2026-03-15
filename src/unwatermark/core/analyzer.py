@@ -36,7 +36,9 @@ _ANALYSIS_PROMPT_TEMPLATE = (
     "- Small logos in corners (e.g., Getty, Shutterstock, YouTube)\n"
     "- 'Made with...' or 'Created by...' text, often in bottom corners\n"
     "- DIAGONAL or ROTATED text across the image (e.g., 'SAMPLE', 'PREVIEW', 'DRAFT' "
-    "at 30-45 degree angles — these are VERY common and easy to miss)\n"
+    "at 30-45 degree angles — these are VERY common and easy to miss). "
+    "IMPORTANT: Diagonal watermarks span the ENTIRE image. Their bounding box "
+    "should cover the full image dimensions (x=0, y=0, width=FULL, height=FULL).\n"
     "- Tiled/repeating watermark patterns across the entire image\n"
     "- Audio waveform labels like 'NotebookLM' on podcast/audio visuals\n"
     "\n"
@@ -132,14 +134,30 @@ def analyze_watermark(
             f"Use this as a strong hint but verify and refine the coordinates."
         )
 
+    # Enhance contrast so faint watermarks are visible to vision models
+    enhanced = _enhance_for_detection(image)
+
     try:
         if config.analysis_provider == AnalysisProvider.CLAUDE:
-            return _analyze_with_claude(image, prompt, config)
+            return _analyze_with_claude(enhanced, prompt, config)
         elif config.analysis_provider == AnalysisProvider.OPENAI:
-            return _analyze_with_openai(image, prompt, config)
+            return _analyze_with_openai(enhanced, prompt, config)
     except Exception as e:
         logger.error(f"AI analysis failed: {e}. Falling back to heuristic.")
         return _heuristic_fallback(image, annotation)
+
+
+def _enhance_for_detection(image: Image.Image) -> Image.Image:
+    """Boost contrast to make faint watermarks visible to vision models.
+
+    Semi-transparent watermarks (SAMPLE PREVIEW, faint overlays) have very low
+    contrast relative to the background — often just 5-15 levels on 0-255.
+    Vision models miss them at normal contrast. 3x enhancement makes the
+    watermark clearly visible without changing the detection coordinates.
+    """
+    from PIL import ImageEnhance
+
+    return ImageEnhance.Contrast(image).enhance(3.0)
 
 
 def _image_to_base64(image: Image.Image) -> str:
@@ -185,6 +203,17 @@ def _parse_analysis_json(raw: str, image: Image.Image) -> WatermarkAnalysis:
         strategy = RemovalStrategy(strategy_str)
 
     ctx = data.get("context", {})
+
+    # Diagonal watermarks span the full image — expand to full dimensions
+    # even if the model reported a small bbox (models often report only the
+    # center portion of diagonal text)
+    desc_lower = data.get("description", "").lower()
+    if "diagonal" in desc_lower or "rotated" in desc_lower:
+        logger.info(
+            f"Expanding diagonal watermark region to full image "
+            f"(was {region.x},{region.y},{region.width}x{region.height})"
+        )
+        region = WatermarkRegion(x=0, y=0, width=image.width, height=image.height)
 
     # Minimal padding — just enough to ensure we capture the full watermark
     # without including excessive background that degrades removal quality
