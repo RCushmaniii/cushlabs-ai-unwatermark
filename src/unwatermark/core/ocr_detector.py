@@ -66,6 +66,10 @@ _WATERMARK_PATTERNS = [
     r"www\.\w+\.\w+",
 ]
 
+# Fail-fast import check — if easyocr isn't installed, importing this
+# module should raise ImportError so callers know OCR is unavailable.
+import easyocr as _easyocr_module  # noqa: F401
+
 # Lazy-loaded EasyOCR reader (heavy initialization — only do it once)
 _reader = None
 
