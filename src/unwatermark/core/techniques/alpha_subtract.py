@@ -68,11 +68,13 @@ class AlphaSubtractTechnique(RemovalTechnique):
         """Run one pass of alpha subtraction. Returns (result, wm_typical) or (None, 0)."""
         from scipy.ndimage import median_filter
 
-        img_arr = np.array(image, dtype=np.float64)
+        # Convert to RGB to avoid RGBA/RGB channel mismatch in subtraction
+        rgb_image = image.convert("RGB")
+        img_arr = np.array(rgb_image, dtype=np.float64)
         h, w = img_arr.shape[:2]
 
         # Work in grayscale for watermark detection
-        gray = np.array(image.convert("L"), dtype=np.float64)
+        gray = np.array(rgb_image.convert("L"), dtype=np.float64)
 
         # Local background estimate — median filter "ignores" watermark text
         # when kernel is larger than stroke width.
