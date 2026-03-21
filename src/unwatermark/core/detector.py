@@ -1,10 +1,12 @@
 """Watermark detection — layered approach for reliable results.
 
-Detection priority:
-1. OCR detection (deterministic, fast, local) — catches text watermarks
-2. Florence-2 via Replicate (~$0.001/call) — catches logos, visual watermarks
-3. Claude/GPT-4o Vision (fallback) — expensive, non-deterministic
-4. Heuristic fallback — when no AI is available
+v2 Detection pipeline:
+1. OCR detection (deterministic, fast, local — optional on lightweight deploys)
+2. Florence-2 via Replicate (~$0.001/call) — catches text + visual watermarks
+   → SAM refinement (~$0.003) — pixel-perfect mask for precise inpainting
+3. Grounded SAM standalone (~$0.003) — combined detection + masking fallback
+4. Claude/GPT-4o Vision (legacy fallback) — expensive, non-deterministic
+5. Heuristic fallback — when no AI is available
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ from PIL import Image
 from unwatermark.config import AnalysisProvider, Config
 from unwatermark.core.analyzer import _heuristic_fallback, analyze_watermark
 from unwatermark.core.florence_detector import detect_watermark_florence
+from unwatermark.core.sam_detector import detect_watermark_sam, refine_with_sam
 from unwatermark.models.analysis import WatermarkAnalysis
 from unwatermark.models.annotation import UserAnnotation
 
@@ -29,32 +32,38 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Circuit breaker: after Florence-2 fails once, skip it for the rest of the session.
-# Avoids wasting 10+ seconds per slide on repeated Replicate API errors.
+# Circuit breakers: after a Replicate model fails once, skip it for the session.
+# Avoids wasting 10+ seconds per slide on repeated API errors.
 _florence_disabled = False
+_sam_disabled = False
 
 
 def detect_watermark(
     image: Image.Image,
     config: Config,
     annotation: UserAnnotation | None = None,
+    skip_vision_ai: bool = False,
 ) -> WatermarkAnalysis:
     """Detect and analyze a watermark in an image.
 
-    Uses a layered approach:
-    1. OCR detection first — deterministic, catches text watermarks reliably
-    2. Florence-2 via Replicate — fast, cheap, handles logos and visual watermarks
-    3. Claude/GPT-4o Vision — legacy fallback if no Replicate token
-    4. Heuristic as last resort — when no AI is available
+    v2 layered approach:
+    1. OCR detection — deterministic, catches text watermarks (optional on deploy)
+    2. Florence-2 → SAM refinement — detect + pixel-perfect mask
+    3. Grounded SAM standalone — combined detection + masking fallback
+    4. Claude/GPT-4o Vision — legacy fallback (skipped if skip_vision_ai=True)
+    5. Heuristic as last resort
 
     Args:
         image: PIL Image to analyze.
         config: Runtime config with API keys and provider selection.
         annotation: Optional user hints.
+        skip_vision_ai: If True, skip Claude/GPT-4o Vision (used in pass 2+).
 
     Returns:
         WatermarkAnalysis with detection results and recommended strategy.
     """
+    global _florence_disabled, _sam_disabled
+
     # Layer 1: OCR detection (deterministic, same result every time)
     # Skipped on lightweight deployments where EasyOCR/PyTorch aren't installed
     known_text = None
@@ -69,6 +78,8 @@ def detect_watermark(
                     f"OCR detection succeeded: '{ocr_result.description}' "
                     f"confidence={ocr_result.confidence}"
                 )
+                # Refine OCR bbox with SAM for pixel-perfect mask
+                ocr_result = _try_sam_refinement(image, ocr_result, config)
                 return ocr_result
             logger.info("OCR found no text watermark — trying Florence-2")
         except Exception as e:
@@ -76,14 +87,14 @@ def detect_watermark(
     else:
         logger.info("EasyOCR not installed — skipping to Florence-2")
 
+    detection_prompt = None
+    if annotation and annotation.has_description:
+        detection_prompt = annotation.description
+
     # Layer 2: Florence-2 via Replicate (cheap, fast, handles visual watermarks)
-    global _florence_disabled
+    # → SAM refinement for pixel-perfect mask when Florence-2 finds something
     if config.has_replicate_token and not _florence_disabled:
         try:
-            detection_prompt = None
-            if annotation and annotation.has_description:
-                detection_prompt = annotation.description
-
             florence_result = detect_watermark_florence(
                 image,
                 replicate_api_token=config.replicate_api_token,
@@ -94,19 +105,43 @@ def detect_watermark(
                     f"Florence-2 detection succeeded: '{florence_result.description}' "
                     f"confidence={florence_result.confidence}"
                 )
+                # Refine with SAM for pixel-perfect mask
+                florence_result = _try_sam_refinement(image, florence_result, config)
                 return florence_result
-            logger.info("Florence-2 found no watermark — trying AI Vision")
+            logger.info("Florence-2 found no watermark — trying Grounded SAM")
         except Exception as e:
             logger.warning(f"Florence-2 failed: {e} — disabling for this session")
             _florence_disabled = True
 
-    # Layer 3: AI Vision — try primary provider, then fallback to secondary
-    if config.use_ai and config.can_use_ai:
+    # Layer 3: Grounded SAM standalone (combined detection + pixel mask in one call)
+    # Catches things Florence-2 missed — logos, visual overlays
+    if config.has_replicate_token and not _sam_disabled:
+        try:
+            sam_result = detect_watermark_sam(
+                image,
+                replicate_api_token=config.replicate_api_token,
+                detection_prompt=detection_prompt,
+            )
+            if sam_result is not None:
+                logger.info(
+                    f"Grounded SAM detection succeeded: '{sam_result.description}' "
+                    f"confidence={sam_result.confidence}"
+                )
+                return sam_result
+            logger.info("Grounded SAM found no watermark — trying AI Vision")
+        except Exception as e:
+            logger.warning(f"Grounded SAM failed: {e} — disabling for this session")
+            _sam_disabled = True
+
+    # Layer 4: AI Vision — try primary provider, then fallback to secondary
+    # Skipped on pass 2+ re-scans (skip_vision_ai=True) to save cost/time
+    if not skip_vision_ai and config.use_ai and config.can_use_ai:
         logger.info(f"Using {config.analysis_provider.value} Vision")
         primary_result = analyze_watermark(image, config, annotation)
 
-        # If primary provider found a watermark, use it
         if primary_result.watermark_found:
+            # Refine AI Vision result with SAM too
+            primary_result = _try_sam_refinement(image, primary_result, config)
             return primary_result
 
         # If primary says no watermark AND isn't very confident, try the OTHER
@@ -131,6 +166,9 @@ def detect_watermark(
                     logger.info(
                         f"GPT-4o found watermark: '{secondary_result.description}'"
                     )
+                    secondary_result = _try_sam_refinement(
+                        image, secondary_result, config
+                    )
                     return secondary_result
             except Exception as e:
                 logger.warning(f"GPT-4o fallback failed: {e}")
@@ -153,11 +191,51 @@ def detect_watermark(
                     logger.info(
                         f"Claude found watermark: '{secondary_result.description}'"
                     )
+                    secondary_result = _try_sam_refinement(
+                        image, secondary_result, config
+                    )
                     return secondary_result
             except Exception as e:
                 logger.warning(f"Claude fallback failed: {e}")
 
         return primary_result
 
-    # Layer 4: Heuristic fallback
+    # Layer 5: Heuristic fallback
     return _heuristic_fallback(image, annotation)
+
+
+def _try_sam_refinement(
+    image: Image.Image,
+    analysis: WatermarkAnalysis,
+    config: Config,
+) -> WatermarkAnalysis:
+    """Attempt to refine a detection result with a SAM pixel-perfect mask.
+
+    If SAM refinement succeeds, attaches the mask to the analysis.
+    If it fails, returns the original analysis unchanged (rectangular mask fallback).
+    """
+    global _sam_disabled
+
+    # Already has a pixel mask (e.g., from Grounded SAM standalone)
+    if analysis.mask is not None:
+        return analysis
+
+    if not config.has_replicate_token or _sam_disabled:
+        return analysis
+
+    try:
+        mask = refine_with_sam(
+            image,
+            analysis,
+            replicate_api_token=config.replicate_api_token,
+        )
+        if mask is not None:
+            analysis.mask = mask
+            logger.info("SAM refinement: attached pixel-perfect mask")
+        else:
+            logger.info("SAM refinement: no mask produced — using rectangular fallback")
+    except Exception as e:
+        logger.warning(f"SAM refinement error: {e} — disabling for this session")
+        _sam_disabled = True
+
+    return analysis

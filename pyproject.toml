@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "unwatermark"
-version = "0.2.0"
+version = "0.3.0"
 description = "AI-powered watermark removal tool for images, PDFs, and PPTX files"
 requires-python = ">=3.10"
 dependencies = [

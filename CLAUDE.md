@@ -46,19 +46,31 @@ src/unwatermark/
     └── app.py              # Inline HTML/JS for the web UI
 ```
 
-## Detection Architecture (v1)
+## Detection Architecture (v2 — current)
 ```
-Image → OCR (EasyOCR, deterministic, local, free)
-           ↓ found text watermark? → use it
+Image → OCR (EasyOCR, deterministic, local — optional on deploy)
+           ↓ found text watermark? → refine with SAM → use it
            ↓ nothing found?
-        AI Vision (Claude/GPT-4o, non-deterministic, $0.02/call)
-           ↓ found watermark? → use it
+        Florence-2 via Replicate (~$0.001/call, text + visual)
+           ↓ found watermark? → refine with SAM for pixel mask → use it
+           ↓ nothing found?
+        Grounded SAM standalone (~$0.003/call, detection + mask in one)
+           ↓ found watermark? → use it (already has pixel mask)
+           ↓ nothing found?
+        Claude/GPT-4o Vision (legacy fallback, ~$0.02/call)
+           ↓ found watermark? → refine with SAM → use it
            ↓ nothing found?
         Heuristic fallback (bottom-right guess)
 ```
 
+### SAM pixel-perfect masking
+Every detection result is refined with Grounded SAM to produce a pixel-perfect
+binary mask (white=watermark, black=keep). This mask feeds directly into LaMa
+inpainting, so only actual watermark pixels are removed — no collateral damage
+to adjacent content text. Falls back to rectangular mask if SAM fails.
+
 ### Multi-pass removal
-Each image gets up to 3 detect-remove cycles. Pass 1 uses full stack (OCR → AI → heuristic). Pass 2+ uses OCR only (fast, no API calls). Stops when no more watermarks are found.
+Each image gets up to 3 detect-remove cycles. Pass 1 uses full stack (OCR → Florence-2 → SAM → AI → heuristic). Pass 2+ uses OCR + Florence-2/SAM (cheap, deterministic) but skips Claude/GPT-4o Vision. Stops when no more watermarks are found.
 
 ### PPTX baseline reuse
 First successful detection on any slide is saved as baseline. If detection fails on a later slide, the baseline is reused (common case: same watermark, same position on every slide).
@@ -104,12 +116,13 @@ pytest
 See `.env.example`. Required: `ANTHROPIC_API_KEY`. Optional: `OPENAI_API_KEY`, `REPLICATE_API_TOKEN`, backend overrides.
 
 ## Known Issues & Limitations
-- OCR can't detect rotated/diagonal watermarks or pure image/logo watermarks (falls through to AI)
-- When watermark physically overlaps content text, removal damages the content (unavoidable)
+- OCR can't detect rotated/diagonal watermarks or pure image/logo watermarks (Florence-2/SAM handle these)
+- SAM pixel masks dramatically reduce content damage, but overlapping watermarks still have some artifacts
 - PDF round-trip rasterizes vector content
-- LaMa + EasyOCR + PyTorch use significant memory (~2-3GB)
-- First OCR call takes ~2s for model initialization
-- EasyOCR model files download on first use (~100MB)
+- LaMa + EasyOCR + PyTorch use significant memory (~2-3GB) on local installs
+- Lightweight deploy (Render) uses Replicate for all ML — fits in 512MB
+- First OCR call takes ~2s for model initialization (local only)
+- Replicate models have cold-start latency (10-30s on first call of session)
 
 ## OCR Pattern Matching
 `ocr_detector.py` scores detected text against known watermark patterns (NotebookLM, Shutterstock, Getty, DRAFT, etc.). Key rules:
@@ -118,14 +131,10 @@ See `.env.example`. Required: `ANTHROPIC_API_KEY`. Optional: `OPENAI_API_KEY`, `
 - Pattern match scores +5.0 (dominant signal), non-pattern text needs score ≥ 4.5
 - Bounding box expands 50% leftward to capture icons/logos beside text
 
-## Planned: v2 Detection Architecture
-```
-Florence-2 (replaces both EasyOCR AND Claude Vision — handles text, logos, rotated text)
-     → SAM (Segment Anything — pixel-perfect mask instead of rectangle)
-          → LaMa inpainting (only inpaints actual watermark pixels)
-```
-Benefits: fully local, deterministic, handles all watermark types, pixel-perfect masks.
-Trade-off: ~4GB model downloads, higher memory usage.
+## Scope & Expectations
+Optimized for **corner watermarks** (NotebookLM, copyright text, small logos).
+Not designed for: stock photo tiled patterns, large diagonal overlays, or
+watermarks that cover >25% of the image. The UI should set these expectations.
 
 ## Deployment Strategy
 - **Web frontend + API** → Render or Railway ($7-25/mo)

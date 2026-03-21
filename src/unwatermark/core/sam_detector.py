@@ -1,10 +1,14 @@
-"""Grounded SAM watermark detection — text-prompted segmentation via Replicate.
+"""Grounded SAM watermark detection & mask refinement via Replicate.
 
-Uses Grounding DINO to find watermarks by text prompt, then SAM to create
-pixel-perfect masks. Returns both the bounding box (for analysis) and the
-binary mask (for precise inpainting that doesn't damage surrounding content).
+Two modes:
+1. **Standalone detection** — Grounding DINO finds watermarks by text prompt,
+   SAM creates pixel-perfect masks. One API call: detection + masking (~$0.003).
+2. **Mask refinement** — Takes an existing bounding box (from Florence-2 or OCR)
+   and generates a pixel-perfect SAM mask for just that region. This is the v2
+   upgrade: precise masks instead of rectangles = no collateral damage to content.
 
-One API call does both detection AND masking at ~$0.003/run, ~4 seconds.
+Both modes return binary masks (white=watermark, black=keep) that feed directly
+into LaMa inpainting via WatermarkAnalysis.mask.
 """
 
 from __future__ import annotations
@@ -160,3 +164,113 @@ def detect_watermark_sam(
         reasoning="Grounded SAM pixel-perfect segmentation with LaMa inpainting",
         mask=mask_image,
     )
+
+
+def refine_with_sam(
+    image: Image.Image,
+    analysis: WatermarkAnalysis,
+    replicate_api_token: str | None = None,
+    max_mask_percent: float = 25.0,
+) -> Image.Image | None:
+    """Refine an existing detection with a pixel-perfect SAM mask.
+
+    Takes a WatermarkAnalysis (from Florence-2 or OCR) that has a bounding box
+    but no pixel mask, and calls Grounded SAM to generate a precise mask within
+    that region. The mask covers only the actual watermark pixels, not the
+    surrounding content — this is what prevents LaMa from damaging nearby text.
+
+    Args:
+        image: Full PIL Image.
+        analysis: Existing detection with bounding box (from Florence-2/OCR).
+        replicate_api_token: Replicate API token.
+        max_mask_percent: Max percentage of image area the mask can cover.
+
+    Returns:
+        PIL Image mask (L mode, white=watermark) or None if refinement fails.
+    """
+    try:
+        import replicate
+    except ImportError:
+        logger.warning("Replicate package not installed — skipping SAM refinement")
+        return None
+
+    if not replicate_api_token:
+        return None
+
+    client = replicate.Client(api_token=replicate_api_token)
+
+    # Build a focused prompt from the detection description
+    desc = (analysis.description or "").lower()
+    if "notebooklm" in desc:
+        mask_prompt = "NotebookLM watermark logo text"
+    elif "shutterstock" in desc:
+        mask_prompt = "Shutterstock watermark text"
+    elif any(kw in desc for kw in ["florence", "ocr", "text watermark"]):
+        # Extract the actual watermark text from descriptions like
+        # "Florence-2 OCR: 'NotebookLM'" or "Text watermark: 'SAMPLE'"
+        import re
+        text_match = re.search(r"'([^']+)'", analysis.description)
+        if text_match:
+            mask_prompt = f"{text_match.group(1)} watermark"
+        else:
+            mask_prompt = "watermark text overlay"
+    else:
+        mask_prompt = "watermark"
+
+    # Encode the full image (SAM needs full context for accurate segmentation)
+    img_bytes = io.BytesIO()
+    image.convert("RGB").save(img_bytes, format="PNG")
+    img_bytes.seek(0)
+
+    try:
+        logger.info(f"SAM refinement: generating pixel mask for '{mask_prompt}'...")
+        output = client.run(
+            _GROUNDED_SAM_MODEL,
+            input={
+                "image": img_bytes,
+                "mask_prompt": mask_prompt,
+                "adjustment_factor": 0,
+            },
+        )
+
+        output_list = list(output)
+        if len(output_list) < 3:
+            logger.info("SAM refinement: no mask output")
+            return None
+
+        # Get the binary mask (index 2)
+        mask_url = output_list[2]
+        if hasattr(mask_url, "url"):
+            mask_url = mask_url.url
+        mask_url = str(mask_url)
+
+        import urllib.request
+        with urllib.request.urlopen(mask_url) as resp:
+            mask_image = Image.open(io.BytesIO(resp.read())).convert("L")
+
+    except Exception as e:
+        logger.warning(f"SAM refinement failed: {e}")
+        return None
+
+    # Validate the mask
+    mask_arr = np.array(mask_image)
+    white_pixels = np.sum(mask_arr > 128)
+    total_pixels = mask_arr.size
+
+    if white_pixels == 0:
+        logger.info("SAM refinement: empty mask — SAM couldn't find the watermark")
+        return None
+
+    mask_percent = (white_pixels / total_pixels) * 100
+    if mask_percent > max_mask_percent:
+        logger.warning(
+            f"SAM refinement: mask too large ({mask_percent:.1f}%) — rejecting"
+        )
+        return None
+
+    # Resize mask to match input image if needed
+    if mask_image.size != image.size:
+        mask_image = mask_image.resize(image.size, Image.NEAREST)
+
+    logger.info(f"SAM refinement: pixel-perfect mask covers {mask_percent:.1f}% of image")
+    return mask_image

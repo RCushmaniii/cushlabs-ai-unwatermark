@@ -4,8 +4,9 @@ After removing a watermark, re-scans the image for additional watermarks.
 Handles cases like images with multiple overlapping watermarks (e.g., a
 stock photo with both a tiled "Shutterstock" pattern and a corner logo).
 
-Pass 1 uses the full detection stack (OCR → AI → heuristic).
-Pass 2+ uses OCR only to avoid expensive/slow AI calls for each re-scan.
+Pass 1 uses the full detection stack (OCR → Florence-2 → SAM → AI → heuristic).
+Pass 2+ uses OCR + Florence-2/SAM (cheap, deterministic) but skips Claude/GPT-4o
+Vision to avoid expensive non-deterministic calls on re-scans.
 Caps at MAX_PASSES to prevent infinite loops.
 """
 
@@ -107,19 +108,39 @@ def clean_image(
                     # AI vision or heuristic result
                     _emit(on_progress, f"Found: '{desc}'", pass_base_pct + 10)
         else:
-            # Subsequent passes: OCR only (fast, no API calls)
-            # On lightweight deployments without EasyOCR, skip extra passes
+            # Subsequent passes: OCR + Florence-2/SAM (cheap, deterministic)
+            # Skips Claude/GPT-4o Vision to avoid expensive re-scans
             _emit(on_progress, "Re-scanning for additional watermarks...", pass_base_pct)
-            if not _HAS_EASYOCR:
-                logger.info(f"Pass {pass_num}: EasyOCR not installed — skipping extra passes")
-                break
-            ocr_result = detect_watermark_ocr(current, known_text=known_text)
-            if ocr_result is not None:
-                analysis = ocr_result
-                _emit(on_progress, f"Found: '{analysis.description}'", pass_base_pct + 5)
+            if _HAS_EASYOCR:
+                ocr_result = detect_watermark_ocr(current, known_text=known_text)
+                if ocr_result is not None:
+                    analysis = ocr_result
+                    _emit(
+                        on_progress, f"Found: '{analysis.description}'", pass_base_pct + 5
+                    )
+                else:
+                    logger.info(f"Pass {pass_num}: OCR found nothing on re-scan")
+                    # Fall through to Florence-2/SAM re-scan below
+                    analysis = detect_watermark(
+                        current, config, annotation, skip_vision_ai=True
+                    )
+                    if not analysis.watermark_found:
+                        logger.info(f"Pass {pass_num}: no more watermarks found — done")
+                        break
+                    _emit(
+                        on_progress, f"Found: '{analysis.description}'", pass_base_pct + 5
+                    )
             else:
-                logger.info(f"Pass {pass_num}: no more text watermarks found — done")
-                break
+                # Lightweight deploy: use Florence-2/SAM (skip Vision AI)
+                analysis = detect_watermark(
+                    current, config, annotation, skip_vision_ai=True
+                )
+                if not analysis.watermark_found:
+                    logger.info(f"Pass {pass_num}: no more watermarks found — done")
+                    break
+                _emit(
+                    on_progress, f"Found: '{analysis.description}'", pass_base_pct + 5
+                )
 
         if not analysis.watermark_found:
             # Baseline is only useful for SAME watermark in SAME position across
