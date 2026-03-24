@@ -6,6 +6,7 @@ Targets the common case: slides that are each a single full-size PNG image
 
 from __future__ import annotations
 
+import gc
 import io
 import logging
 from pathlib import Path
@@ -154,6 +155,10 @@ def process_pptx(
                 )
             else:
                 logger.warning(f"Slide {slide_num}: image part not found")
+
+            # Free per-slide memory — prevents accumulation across 20 slides
+            del buf, cleaned, result, image, image_bytes
+            gc.collect()
 
     if on_progress:
         on_progress("Saving presentation...", 95)

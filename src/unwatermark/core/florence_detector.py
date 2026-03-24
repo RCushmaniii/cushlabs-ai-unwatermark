@@ -63,12 +63,9 @@ def detect_watermark_florence(
     Returns:
         WatermarkAnalysis if watermark detected, None if nothing found.
     """
-    import replicate
+    from unwatermark.config import get_replicate_client
 
-    if replicate_api_token:
-        client = replicate.Client(api_token=replicate_api_token)
-    else:
-        client = replicate.Client()
+    client = get_replicate_client(replicate_api_token)
 
     img_w, img_h = image.size
     img_uri = _image_to_data_uri(image)
@@ -174,11 +171,16 @@ def _try_ocr_with_region(
 
 
 def _image_to_data_uri(image: Image.Image) -> str:
-    """Convert PIL Image to a base64 data URI for Replicate API."""
+    """Convert PIL Image to a base64 data URI for Replicate API.
+
+    Uses JPEG encoding (quality 85) instead of PNG — ~20x smaller payload.
+    Detection models don't need lossless input, and this saves significant
+    memory + upload time on constrained deployments.
+    """
     buf = io.BytesIO()
-    image.convert("RGB").save(buf, format="PNG")
+    image.convert("RGB").save(buf, format="JPEG", quality=85)
     b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-    return f"data:image/png;base64,{b64}"
+    return f"data:image/jpeg;base64,{b64}"
 
 
 def _extract_text(output) -> str:

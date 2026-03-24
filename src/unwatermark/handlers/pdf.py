@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import io
 import logging
 from pathlib import Path
@@ -24,7 +25,7 @@ def process_pdf(
     config: Config,
     annotation: UserAnnotation | None = None,
     force_strategy: str | None = None,
-    dpi: int = 200,
+    dpi: int = 150,
     on_progress: Callable[[str, int], None] | None = None,
 ) -> Path:
     """Remove watermarks from a PDF by rendering pages, cleaning, and reassembling.
@@ -75,6 +76,8 @@ def process_pdf(
         pix = page.get_pixmap(matrix=matrix)
 
         image = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+        # Free the pixmap immediately — PIL now owns the pixel data
+        del pix
 
         # Create a sub-progress callback that prefixes messages with page info
         # and maps clean_image's 10-95% range into this page's slice
@@ -94,6 +97,8 @@ def process_pdf(
             baseline=baseline_analysis,
             on_progress=page_progress,
         )
+        # Free the original image — clean_image returns a new one
+        del image
 
         if baseline_analysis is None and result.first_analysis is not None:
             baseline_analysis = result.first_analysis
@@ -111,13 +116,16 @@ def process_pdf(
 
         buf = io.BytesIO()
         cleaned.save(buf, format="JPEG", quality=95)
-        buf.seek(0)
+        jpeg_bytes = buf.getvalue()
+        del buf, cleaned, result
 
-        img_doc = fitz.open(stream=buf.read(), filetype="jpeg")
         rect = page.rect
         out_page = out_doc.new_page(width=rect.width, height=rect.height)
-        out_page.insert_image(rect, stream=img_doc.tobytes())
-        img_doc.close()
+        out_page.insert_image(rect, stream=jpeg_bytes)
+        del jpeg_bytes
+
+        # Free memory between pages — prevents accumulation across a 20-page PDF
+        gc.collect()
 
     if on_progress:
         on_progress("Assembling PDF...", 95)

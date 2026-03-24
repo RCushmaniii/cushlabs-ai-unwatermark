@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import logging
@@ -18,6 +19,7 @@ from PIL import Image
 from unwatermark.cli import _get_handler
 from unwatermark.config import load_config
 from unwatermark.core.detector import detect_watermark
+from unwatermark.core.multipass import constrain_image_size
 from unwatermark.models.analysis import WatermarkRegion
 from unwatermark.models.annotation import UserAnnotation
 from unwatermark.pages import (
@@ -49,6 +51,13 @@ FAVICON_SVG = (
 # Download token store — persists to disk so tokens survive server reloads
 _DOWNLOAD_DIR = Path(tempfile.gettempdir()) / "unwatermark_downloads"
 _DOWNLOAD_DIR.mkdir(exist_ok=True)
+
+# Serialize heavy processing — only one /process request at a time.
+# On Render free tier (512MB), two concurrent uploads = instant OOM.
+_processing_semaphore = asyncio.Semaphore(1)
+
+# Max upload size: 100MB (prevents accidental huge uploads from eating RAM)
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
 
 # ---------------------------------------------------------------------------
@@ -149,6 +158,11 @@ async def analyze_file(
 ):
     """Analyze an uploaded file for watermarks."""
     content = await file.read()
+    if len(content) > MAX_UPLOAD_BYTES:
+        return JSONResponse(
+            {"error": f"File too large (max {MAX_UPLOAD_BYTES // (1024*1024)}MB)."},
+            status_code=400,
+        )
     suffix = Path(file.filename).suffix.lower() if file.filename else ""
     is_image = suffix in {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}
 
@@ -203,6 +217,7 @@ async def analyze_file(
 
     try:
         image = Image.open(io.BytesIO(content))
+        image = constrain_image_size(image)
     except Exception:
         return JSONResponse(
             {"error": "Could not open file as an image. Check the file format."},
@@ -259,9 +274,18 @@ async def process_file(
             status_code=400,
         )
 
+    # Stream upload to disk in chunks instead of buffering entire file in RAM
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp_in:
-        content = await file.read()
-        tmp_in.write(content)
+        total_bytes = 0
+        while chunk := await file.read(64 * 1024):  # 64KB chunks
+            total_bytes += len(chunk)
+            if total_bytes > MAX_UPLOAD_BYTES:
+                Path(tmp_in.name).unlink(missing_ok=True)
+                return JSONResponse(
+                    {"error": f"File too large (max {MAX_UPLOAD_BYTES // (1024*1024)}MB)."},
+                    status_code=400,
+                )
+            tmp_in.write(chunk)
         tmp_in.flush()
         input_path = Path(tmp_in.name)
 
@@ -301,36 +325,44 @@ async def process_file(
             logger.exception("Processing failed")
             error_holder.append(_friendly_error(e))
         finally:
+            # Clean up input temp file — output is kept for download
+            input_path.unlink(missing_ok=True)
             done_event.set()
 
-    # Run the handler in a thread so we can stream progress
-    thread = threading.Thread(target=run_handler, daemon=True)
-    thread.start()
+    # Serialize processing — only one heavy job at a time (512MB RAM limit)
+    acquired = _processing_semaphore.locked()
+    if acquired:
+        on_progress("Waiting for previous job to finish...", 0)
 
-    def event_stream():
-        sent = 0
-        while not done_event.is_set():
-            done_event.wait(timeout=0.3)
+    async def guarded_stream():
+        async with _processing_semaphore:
+            # Run the handler in a thread so we can stream progress
+            thread = threading.Thread(target=run_handler, daemon=True)
+            thread.start()
+
+            sent = 0
+            while not done_event.is_set():
+                done_event.wait(timeout=0.3)
+                while sent < len(progress_events):
+                    yield json.dumps(progress_events[sent]) + "\n"
+                    sent += 1
+
+            # Flush remaining
             while sent < len(progress_events):
                 yield json.dumps(progress_events[sent]) + "\n"
                 sent += 1
 
-        # Flush remaining
-        while sent < len(progress_events):
-            yield json.dumps(progress_events[sent]) + "\n"
-            sent += 1
+            if error_holder:
+                yield json.dumps({"type": "error", "message": error_holder[0]}) + "\n"
+            else:
+                token = str(uuid.uuid4())[:8]
+                # Persist token mapping to disk so it survives server reloads
+                meta = {"path": str(output_path), "name": f"clean_{original_filename}"}
+                (_DOWNLOAD_DIR / f"{token}.json").write_text(json.dumps(meta))
+                logger.info(f"Download ready: token={token}, path={output_path}")
+                yield json.dumps({"type": "complete", "download_token": token}) + "\n"
 
-        if error_holder:
-            yield json.dumps({"type": "error", "message": error_holder[0]}) + "\n"
-        else:
-            token = str(uuid.uuid4())[:8]
-            # Persist token mapping to disk so it survives server reloads
-            meta = {"path": str(output_path), "name": f"clean_{original_filename}"}
-            (_DOWNLOAD_DIR / f"{token}.json").write_text(json.dumps(meta))
-            logger.info(f"Download ready: token={token}, path={output_path}")
-            yield json.dumps({"type": "complete", "download_token": token}) + "\n"
-
-    return StreamingResponse(event_stream(), media_type="application/x-ndjson")
+    return StreamingResponse(guarded_stream(), media_type="application/x-ndjson")
 
 
 @app.get("/download/{token}")

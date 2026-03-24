@@ -58,17 +58,16 @@ def detect_watermark_sam(
     Returns:
         WatermarkAnalysis with pixel-perfect mask, or None if no watermark found.
     """
-    try:
-        import replicate
-    except ImportError:
-        logger.warning("Replicate package not installed — skipping SAM detection")
-        return None
-
     if not replicate_api_token:
         logger.warning("No Replicate API token — skipping SAM detection")
         return None
 
-    client = replicate.Client(api_token=replicate_api_token)
+    try:
+        from unwatermark.config import get_replicate_client
+        client = get_replicate_client(replicate_api_token)
+    except (ImportError, RuntimeError):
+        logger.warning("Replicate package not installed — skipping SAM detection")
+        return None
 
     # Build the mask prompt
     if detection_prompt:
@@ -76,9 +75,9 @@ def detect_watermark_sam(
     else:
         mask_prompt = "watermark"
 
-    # Encode image
+    # Encode image — JPEG for smaller payload (detection doesn't need lossless)
     img_bytes = io.BytesIO()
-    image.convert("RGB").save(img_bytes, format="PNG")
+    image.convert("RGB").save(img_bytes, format="JPEG", quality=85)
     img_bytes.seek(0)
 
     try:
@@ -188,16 +187,15 @@ def refine_with_sam(
     Returns:
         PIL Image mask (L mode, white=watermark) or None if refinement fails.
     """
-    try:
-        import replicate
-    except ImportError:
-        logger.warning("Replicate package not installed — skipping SAM refinement")
-        return None
-
     if not replicate_api_token:
         return None
 
-    client = replicate.Client(api_token=replicate_api_token)
+    try:
+        from unwatermark.config import get_replicate_client
+        client = get_replicate_client(replicate_api_token)
+    except (ImportError, RuntimeError):
+        logger.warning("Replicate package not installed — skipping SAM refinement")
+        return None
 
     # Build a focused prompt from the detection description
     desc = (analysis.description or "").lower()
@@ -217,9 +215,9 @@ def refine_with_sam(
     else:
         mask_prompt = "watermark"
 
-    # Encode the full image (SAM needs full context for accurate segmentation)
+    # Encode the full image — JPEG for smaller payload, SAM doesn't need lossless
     img_bytes = io.BytesIO()
-    image.convert("RGB").save(img_bytes, format="PNG")
+    image.convert("RGB").save(img_bytes, format="JPEG", quality=85)
     img_bytes.seek(0)
 
     try:

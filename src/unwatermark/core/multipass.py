@@ -40,6 +40,27 @@ logger = logging.getLogger(__name__)
 
 MAX_PASSES = 3
 
+# Cap image dimensions to limit memory usage on constrained deployments.
+# A 2048px image is ~12MB uncompressed vs ~35MB at 4000px — 3x savings that
+# compound across multi-pass detection (base64 encoding, API uploads, masks).
+MAX_IMAGE_DIMENSION = 2048
+
+
+def constrain_image_size(image: Image.Image, max_dim: int = MAX_IMAGE_DIMENSION) -> Image.Image:
+    """Downscale an image so its longest side is at most max_dim pixels.
+
+    Returns the original image unchanged if already within bounds.
+    Uses LANCZOS resampling for high-quality downscaling.
+    """
+    w, h = image.size
+    if w <= max_dim and h <= max_dim:
+        return image
+    scale = max_dim / max(w, h)
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+    logger.info(f"Downscaling image from {w}x{h} to {new_w}x{new_h} (memory optimization)")
+    return image.resize((new_w, new_h), Image.LANCZOS)
+
 
 @dataclass
 class CleanResult:
@@ -78,7 +99,7 @@ def clean_image(
     Returns:
         CleanResult with cleaned image, count of removals, and first analysis.
     """
-    current = image
+    current = constrain_image_size(image)
     removed = 0
     first_analysis: WatermarkAnalysis | None = None
 
@@ -184,7 +205,11 @@ def clean_image(
         removal_pct = pass_base_pct + 10
         _emit(on_progress, f"Removing watermark with {technique_name}...", removal_pct)
 
+        old_current = current
         current = remove_watermark(current, analysis, config, force_strategy)
+        # Explicitly free the pre-removal image so gc.collect() can reclaim it
+        if old_current is not current:
+            del old_current
         removed += 1
 
         # Free memory between passes — LaMa and OCR are memory-hungry

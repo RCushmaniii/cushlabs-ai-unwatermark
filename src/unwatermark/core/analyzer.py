@@ -161,9 +161,13 @@ def _enhance_for_detection(image: Image.Image) -> Image.Image:
 
 
 def _image_to_base64(image: Image.Image) -> str:
-    """Encode a PIL Image as base64 PNG for API transmission."""
+    """Encode a PIL Image as base64 JPEG for API transmission.
+
+    JPEG at quality 85 is ~20x smaller than PNG — saves significant memory
+    and upload time. Vision models handle JPEG fine for watermark detection.
+    """
     buf = io.BytesIO()
-    image.convert("RGB").save(buf, format="PNG")
+    image.convert("RGB").save(buf, format="JPEG", quality=85)
     return base64.standard_b64encode(buf.getvalue()).decode("utf-8")
 
 
@@ -267,7 +271,7 @@ def _analyze_with_claude(
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": "image/png",
+                            "media_type": "image/jpeg",
                             "data": img_b64,
                         },
                     },
@@ -312,7 +316,7 @@ def _analyze_with_openai(
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"data:image/png;base64,{img_b64}",
+                            "url": f"data:image/jpeg;base64,{img_b64}",
                         },
                     },
                     {"type": "text", "text": prompt},

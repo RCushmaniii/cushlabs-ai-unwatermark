@@ -209,22 +209,13 @@ class LamaInpaintTechnique(RemovalTechnique):
 
     def _run_replicate(self, image: Image.Image, mask: Image.Image) -> Image.Image:
         """Run LaMa on Replicate's hosted infrastructure."""
-        try:
-            import replicate
-        except ImportError:
-            raise RuntimeError(
-                "Replicate backend requires the 'replicate' package.\n"
-                "Install it with: pip install replicate"
-            )
+        from unwatermark.config import get_replicate_client
 
         api_token = self._backend_kwargs.get("api_token")
-        if api_token:
-            client = replicate.Client(api_token=api_token)
-        else:
-            client = replicate.Client()
+        client = get_replicate_client(api_token)
 
-        # Encode images to bytes
-        img_bytes = self._image_to_bytes(image, "PNG")
+        # Encode image as JPEG (smaller upload), mask stays PNG (needs lossless binary)
+        img_bytes = self._image_to_bytes(image, "JPEG")
         mask_bytes = self._image_to_bytes(mask, "PNG")
 
         output = client.run(
@@ -307,7 +298,10 @@ class LamaInpaintTechnique(RemovalTechnique):
     @staticmethod
     def _image_to_bytes(image: Image.Image, fmt: str) -> bytes:
         buf = io.BytesIO()
-        image.save(buf, format=fmt)
+        if fmt == "JPEG":
+            image.convert("RGB").save(buf, format=fmt, quality=90)
+        else:
+            image.save(buf, format=fmt)
         return buf.getvalue()
 
     @staticmethod

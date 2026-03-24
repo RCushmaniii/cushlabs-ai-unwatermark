@@ -73,6 +73,35 @@ class Config:
         return False
 
 
+# Cached Replicate client — avoids creating a new HTTP session per API call.
+# On a 14-slide PPTX with Florence-2 + SAM + LaMa per slide, that's 40+ client
+# instantiations saved. Thread-safe: replicate.Client is stateless after init.
+_replicate_client: object | None = None
+_replicate_client_token: str | None = None
+
+
+def get_replicate_client(api_token: str | None = None):
+    """Return a cached Replicate client, creating one if needed.
+
+    The client is cached at module level and reused across all API calls.
+    If api_token changes, a new client is created.
+    """
+    global _replicate_client, _replicate_client_token
+
+    token = api_token or os.getenv("REPLICATE_API_TOKEN", "") or os.getenv("REPLICATE_API", "")
+
+    if _replicate_client is not None and _replicate_client_token == token:
+        return _replicate_client
+
+    try:
+        import replicate
+        _replicate_client = replicate.Client(api_token=token) if token else replicate.Client()
+        _replicate_client_token = token
+        return _replicate_client
+    except ImportError:
+        raise RuntimeError("Replicate package not installed. Install with: pip install replicate")
+
+
 def load_config(**overrides) -> Config:
     """Load config from environment variables, with optional overrides."""
     config = Config(
