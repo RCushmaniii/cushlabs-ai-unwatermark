@@ -22,7 +22,7 @@ from PIL import Image
 from unwatermark.config import Config
 from unwatermark.core.detector import detect_watermark
 from unwatermark.core.remover import remove_watermark
-from unwatermark.models.analysis import RemovalStrategy, WatermarkAnalysis, WatermarkRegion
+from unwatermark.models.analysis import WatermarkAnalysis
 from unwatermark.models.annotation import UserAnnotation
 
 if TYPE_CHECKING:
@@ -141,27 +141,40 @@ def clean_image(
                     )
                 else:
                     logger.info(f"Pass {pass_num}: OCR found nothing on re-scan")
-                    # Fall through to Florence-2/SAM re-scan below
+                    # On re-scan passes, only trust deterministic detectors
+                    # (OCR, Florence-2, SAM). Do NOT fall through to the
+                    # heuristic — it always "finds" something and causes
+                    # unnecessary inpainting of clean areas.
+                    if config.has_replicate_token:
+                        analysis = detect_watermark(
+                            current, config, annotation, skip_vision_ai=True
+                        )
+                        # Reject heuristic guesses on re-scans
+                        if not analysis.watermark_found or "heuristic" in (analysis.description or "").lower():
+                            logger.info(f"Pass {pass_num}: no more watermarks found — done")
+                            break
+                        _emit(
+                            on_progress, f"Found: '{analysis.description}'", pass_base_pct + 5
+                        )
+                    else:
+                        logger.info(f"Pass {pass_num}: no Florence-2/SAM available — done")
+                        break
+            else:
+                # Lightweight deploy without EasyOCR: use Florence-2/SAM
+                if config.has_replicate_token:
                     analysis = detect_watermark(
                         current, config, annotation, skip_vision_ai=True
                     )
-                    if not analysis.watermark_found:
+                    # Reject heuristic guesses on re-scans
+                    if not analysis.watermark_found or "heuristic" in (analysis.description or "").lower():
                         logger.info(f"Pass {pass_num}: no more watermarks found — done")
                         break
                     _emit(
                         on_progress, f"Found: '{analysis.description}'", pass_base_pct + 5
                     )
-            else:
-                # Lightweight deploy: use Florence-2/SAM (skip Vision AI)
-                analysis = detect_watermark(
-                    current, config, annotation, skip_vision_ai=True
-                )
-                if not analysis.watermark_found:
-                    logger.info(f"Pass {pass_num}: no more watermarks found — done")
+                else:
+                    logger.info(f"Pass {pass_num}: no detectors available for re-scan — done")
                     break
-                _emit(
-                    on_progress, f"Found: '{analysis.description}'", pass_base_pct + 5
-                )
 
         if not analysis.watermark_found:
             # Baseline is only useful for SAME watermark in SAME position across
@@ -214,63 +227,6 @@ def clean_image(
 
         # Free memory between passes — LaMa and OCR are memory-hungry
         gc.collect()
-
-    # Final AI pass: if we removed watermarks via OCR but the full detection
-    # stack wasn't exhausted on the last pass, run one more full-stack check.
-    # This catches watermarks that OCR can't see (diagonal text, logos) but
-    # that Claude/GPT-4o Vision can detect. Only runs if:
-    #   1. We already removed at least one watermark (so there was a real watermark)
-    #   2. AI detection is available (has API key)
-    #   3. The first pass found something via OCR (meaning AI was never tried)
-    if (
-        removed > 0
-        and config.use_ai
-        and config.can_use_ai
-        and first_analysis is not None
-        and first_analysis.description.startswith("Text watermark:")  # OCR result
-    ):
-        final_pct = 80
-        _emit(on_progress, "Final check for hidden watermarks...", final_pct)
-        logger.info("Final pass: full-stack check for non-text watermarks (diagonal, logos)")
-        final_analysis = detect_watermark(current, config, annotation)
-        if final_analysis.watermark_found:
-            r = final_analysis.region
-            logger.info(
-                f"Final pass: found '{final_analysis.description}' "
-                f"at ({r.x},{r.y},{r.width}x{r.height})"
-            )
-            _emit(on_progress, f"Removing: '{final_analysis.description}'...", 85)
-            current = remove_watermark(current, final_analysis, config, force_strategy)
-            removed += 1
-            gc.collect()
-        else:
-            logger.info("Final pass: no additional watermarks found")
-
-    # Stock photo tiled watermark cleanup: if we detected a stock photo brand
-    # (Shutterstock, Getty, etc.), the visible corner text is just the tip —
-    # there's usually a repeating semi-transparent watermark pattern across
-    # the entire image. Run alpha subtraction on the full image to remove it.
-    _STOCK_BRANDS = ["shutterstock", "getty", "istock", "dreamstime", "123rf",
-                     "alamy", "depositphoto", "fotolia", "bigstock", "adobe stock"]
-    if removed > 0 and first_analysis is not None:
-        desc_lower = (first_analysis.description or "").lower()
-        is_stock = any(brand in desc_lower for brand in _STOCK_BRANDS)
-        if is_stock:
-            _emit(on_progress, "Removing tiled watermark pattern...", 90)
-            logger.info("Stock photo detected — applying full-image alpha subtraction for tiled pattern")
-            full_region = WatermarkRegion(x=0, y=0, width=current.width, height=current.height)
-            tiled_analysis = WatermarkAnalysis(
-                watermark_found=True,
-                region=full_region,
-                description=f"Tiled {first_analysis.description}",
-                strategy=RemovalStrategy.ALPHA_SUBTRACT,
-                confidence=0.7,
-            )
-            from unwatermark.core.techniques.alpha_subtract import AlphaSubtractTechnique
-            technique = AlphaSubtractTechnique()
-            current = technique.remove(current, full_region, tiled_analysis)
-            removed += 1
-            gc.collect()
 
     if removed > 1:
         logger.info(f"Multi-pass complete: removed {removed} watermarks")

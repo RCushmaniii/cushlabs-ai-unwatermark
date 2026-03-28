@@ -45,7 +45,7 @@ def detect_watermark_sam(
     image: Image.Image,
     replicate_api_token: str | None = None,
     detection_prompt: str | None = None,
-    max_mask_percent: float = 25.0,
+    max_mask_percent: float = 10.0,
 ) -> WatermarkAnalysis | None:
     """Detect watermarks using Grounded SAM on Replicate.
 
@@ -169,7 +169,7 @@ def refine_with_sam(
     image: Image.Image,
     analysis: WatermarkAnalysis,
     replicate_api_token: str | None = None,
-    max_mask_percent: float = 25.0,
+    max_mask_percent: float = 10.0,
 ) -> Image.Image | None:
     """Refine an existing detection with a pixel-perfect SAM mask.
 

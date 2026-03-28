@@ -45,33 +45,21 @@ def remove_watermark(
         inpaint_available=is_lama_available(),
     )
 
-    # Auto-select alpha subtraction for large semi-transparent overlays.
-    # When the watermark region covers >5% of the image area, it's likely
-    # a semi-transparent overlay (diagonal SAMPLE PREVIEW, large Shutterstock)
-    # that alpha subtraction handles better than inpainting.
     r = analysis.region
-    if strategy == RemovalStrategy.INPAINT and force_strategy is None:
-        img_area = image.width * image.height
-        wm_area = r.width * r.height
-        coverage = wm_area / img_area if img_area > 0 else 0
-        desc_lower = (analysis.description or "").lower()
-        # Keywords alone aren't enough — require minimum 3% coverage to avoid
-        # routing tiny corner watermarks to alpha subtraction.
-        has_overlay_keywords = (
-            "diagonal" in desc_lower
-            or "semi-transparent" in desc_lower
-            or "faint" in desc_lower
+
+    # Safety guard: reject detections that cover too much of the image.
+    # Large diagonal overlays (SAMPLE PREVIEW, DRAFT across full slide) can't
+    # be safely inpainted — better to skip than destroy the image content.
+    img_area = image.width * image.height
+    wm_area = r.width * r.height
+    coverage = wm_area / img_area if img_area > 0 else 0
+    if coverage > 0.08 and force_strategy is None:
+        logger.warning(
+            f"Skipping removal: watermark region covers {coverage:.1%} of image "
+            f"(>{8}% safety limit). Region=({r.x},{r.y},{r.width}x{r.height}), "
+            f"desc='{analysis.description}'"
         )
-        is_likely_overlay = (
-            coverage > 0.05
-            or (has_overlay_keywords and coverage > 0.03)
-        )
-        if is_likely_overlay:
-            logger.info(
-                f"Auto-switching to alpha subtraction: "
-                f"coverage={coverage:.1%}, desc='{analysis.description[:60]}'"
-            )
-            strategy = RemovalStrategy.ALPHA_SUBTRACT
+        return image.copy()
 
     technique = get_technique(strategy, config)
     logger.info(
