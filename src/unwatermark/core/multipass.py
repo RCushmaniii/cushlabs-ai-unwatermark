@@ -160,21 +160,15 @@ def clean_image(
                         logger.info(f"Pass {pass_num}: no Florence-2/SAM available — done")
                         break
             else:
-                # Lightweight deploy without EasyOCR: use Florence-2/SAM
-                if config.has_replicate_token:
-                    analysis = detect_watermark(
-                        current, config, annotation, skip_vision_ai=True
-                    )
-                    # Reject heuristic guesses on re-scans
-                    if not analysis.watermark_found or "heuristic" in (analysis.description or "").lower():
-                        logger.info(f"Pass {pass_num}: no more watermarks found — done")
-                        break
-                    _emit(
-                        on_progress, f"Found: '{analysis.description}'", pass_base_pct + 5
-                    )
-                else:
-                    logger.info(f"Pass {pass_num}: no detectors available for re-scan — done")
+                # Lightweight deploy without EasyOCR: re-scan with full stack
+                # but reject heuristic guesses to prevent blind inpainting.
+                analysis = detect_watermark(current, config, annotation)
+                if not analysis.watermark_found or "heuristic" in (analysis.description or "").lower():
+                    logger.info(f"Pass {pass_num}: no more watermarks found — done")
                     break
+                _emit(
+                    on_progress, f"Found: '{analysis.description}'", pass_base_pct + 5
+                )
 
         if not analysis.watermark_found:
             # Baseline is only useful for SAME watermark in SAME position across
