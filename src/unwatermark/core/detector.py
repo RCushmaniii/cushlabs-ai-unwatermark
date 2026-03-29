@@ -78,60 +78,18 @@ def detect_watermark(
                     f"OCR detection succeeded: '{ocr_result.description}' "
                     f"confidence={ocr_result.confidence}"
                 )
-                # Refine OCR bbox with SAM for pixel-perfect mask
-                ocr_result = _try_sam_refinement(image, ocr_result, config)
                 return ocr_result
-            logger.info("OCR found no text watermark — trying Florence-2")
+            logger.info("OCR found no text watermark — trying AI Vision")
         except Exception as e:
-            logger.warning(f"OCR detection failed: {e} — trying Florence-2")
+            logger.warning(f"OCR detection failed: {e} — trying AI Vision")
     else:
-        logger.info("EasyOCR not installed — skipping to Florence-2")
+        logger.info("EasyOCR not installed — skipping to AI Vision")
 
-    detection_prompt = None
-    if annotation and annotation.has_description:
-        detection_prompt = annotation.description
-
-    # Layer 2: Florence-2 via Replicate (cheap, fast, handles visual watermarks)
-    # → SAM refinement for pixel-perfect mask when Florence-2 finds something
-    if config.has_replicate_token and not _florence_disabled:
-        try:
-            florence_result = detect_watermark_florence(
-                image,
-                replicate_api_token=config.replicate_api_token,
-                detection_prompt=detection_prompt,
-            )
-            if florence_result is not None:
-                logger.info(
-                    f"Florence-2 detection succeeded: '{florence_result.description}' "
-                    f"confidence={florence_result.confidence}"
-                )
-                # Refine with SAM for pixel-perfect mask
-                florence_result = _try_sam_refinement(image, florence_result, config)
-                return florence_result
-            logger.info("Florence-2 found no watermark — trying Grounded SAM")
-        except Exception as e:
-            logger.warning(f"Florence-2 failed: {e} — disabling for this session")
-            _florence_disabled = True
-
-    # Layer 3: Grounded SAM standalone (combined detection + pixel mask in one call)
-    # Catches things Florence-2 missed — logos, visual overlays
-    if config.has_replicate_token and not _sam_disabled:
-        try:
-            sam_result = detect_watermark_sam(
-                image,
-                replicate_api_token=config.replicate_api_token,
-                detection_prompt=detection_prompt,
-            )
-            if sam_result is not None:
-                logger.info(
-                    f"Grounded SAM detection succeeded: '{sam_result.description}' "
-                    f"confidence={sam_result.confidence}"
-                )
-                return sam_result
-            logger.info("Grounded SAM found no watermark — trying AI Vision")
-        except Exception as e:
-            logger.warning(f"Grounded SAM failed: {e} — disabling for this session")
-            _sam_disabled = True
+    # NOTE: Florence-2 and Grounded SAM detection layers are disabled.
+    # Claude Vision handles detection reliably, and the Replicate detection
+    # models (Florence-2, SAM) consume rate limit budget that's better
+    # reserved for LaMa inpainting — the one Replicate call that matters.
+    # Re-enable when Replicate rate limits are no longer a constraint.
 
     # Layer 4: AI Vision — try primary provider, then fallback to secondary
     # Skipped on pass 2+ re-scans (skip_vision_ai=True) to save cost/time
@@ -141,7 +99,6 @@ def detect_watermark(
 
         if primary_result.watermark_found:
             # Refine AI Vision result with SAM too
-            primary_result = _try_sam_refinement(image, primary_result, config)
             return primary_result
 
         # If primary says no watermark AND isn't very confident, try the OTHER
@@ -166,9 +123,6 @@ def detect_watermark(
                     logger.info(
                         f"GPT-4o found watermark: '{secondary_result.description}'"
                     )
-                    secondary_result = _try_sam_refinement(
-                        image, secondary_result, config
-                    )
                     return secondary_result
             except Exception as e:
                 logger.warning(f"GPT-4o fallback failed: {e}")
@@ -190,9 +144,6 @@ def detect_watermark(
                 if secondary_result.watermark_found:
                     logger.info(
                         f"Claude found watermark: '{secondary_result.description}'"
-                    )
-                    secondary_result = _try_sam_refinement(
-                        image, secondary_result, config
                     )
                     return secondary_result
             except Exception as e:

@@ -208,7 +208,12 @@ class LamaInpaintTechnique(RemovalTechnique):
     # -------------------------------------------------------------------------
 
     def _run_replicate(self, image: Image.Image, mask: Image.Image) -> Image.Image:
-        """Run LaMa on Replicate's hosted infrastructure."""
+        """Run LaMa on Replicate's hosted infrastructure.
+
+        Retries up to 3 times on rate limit (429) errors with exponential backoff.
+        This is the most critical Replicate call — worth waiting for.
+        """
+        import time
         from unwatermark.config import get_replicate_client
 
         api_token = self._backend_kwargs.get("api_token")
@@ -218,13 +223,27 @@ class LamaInpaintTechnique(RemovalTechnique):
         img_bytes = self._image_to_bytes(image, "JPEG")
         mask_bytes = self._image_to_bytes(mask, "PNG")
 
-        output = client.run(
-            "twn39/lama",
-            input={
-                "image": io.BytesIO(img_bytes),
-                "mask": io.BytesIO(mask_bytes),
-            },
-        )
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                output = client.run(
+                    "twn39/lama",
+                    input={
+                        "image": io.BytesIO(img_bytes),
+                        "mask": io.BytesIO(mask_bytes),
+                    },
+                )
+                break  # success
+            except Exception as e:
+                if "429" in str(e) and attempt < max_retries - 1:
+                    wait = 10 * (attempt + 1)  # 10s, 20s
+                    logger.warning(
+                        f"LaMa rate limited (attempt {attempt + 1}/{max_retries}), "
+                        f"retrying in {wait}s..."
+                    )
+                    time.sleep(wait)
+                else:
+                    raise
 
         # Replicate returns a URL or file-like output
         if isinstance(output, str):
