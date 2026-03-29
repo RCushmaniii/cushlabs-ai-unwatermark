@@ -213,7 +213,18 @@ def clean_image(
         _emit(on_progress, f"Removing watermark with {technique_name}...", removal_pct)
 
         old_current = current
-        current = remove_watermark(current, analysis, config, force_strategy)
+        result = remove_watermark(current, analysis, config, force_strategy)
+
+        if result is None:
+            # Removal was skipped (region too large for safe inpainting).
+            # Don't re-scan — Vision AI will just find the same thing again.
+            logger.info(
+                f"Pass {pass_num}: removal skipped (region too large), "
+                f"stopping multi-pass for this watermark"
+            )
+            break
+
+        current = result
         # Explicitly free the pre-removal image so gc.collect() can reclaim it
         if old_current is not current:
             del old_current
@@ -221,6 +232,43 @@ def clean_image(
 
         # Free memory between passes — LaMa and OCR are memory-hungry
         gc.collect()
+
+    # Targeted NotebookLM check: if the main loop found a different (larger)
+    # watermark and never specifically found NotebookLM, do one targeted pass.
+    # Skip if NotebookLM was already found and removed in the main loop.
+    already_found_nbm = first_analysis is not None and "notebooklm" in (
+        first_analysis.description or ""
+    ).lower()
+
+    _notebooklm_hint = UserAnnotation(
+        description="NotebookLM", location="bottom-right"
+    )
+    if _HAS_EASYOCR:
+        nbm_check = detect_watermark_ocr(current, known_text="NotebookLM")
+    elif config.can_use_ai:
+        nbm_check = detect_watermark(current, config, _notebooklm_hint)
+        # Only accept if it specifically found NotebookLM (not another watermark)
+        if nbm_check.watermark_found and "notebooklm" not in (
+            nbm_check.description or ""
+        ).lower():
+            nbm_check = None
+    else:
+        nbm_check = None
+
+    if not already_found_nbm and nbm_check is not None and nbm_check.watermark_found:
+        r = nbm_check.region
+        logger.info(
+            f"Targeted NotebookLM pass: found '{nbm_check.description}' "
+            f"at ({r.x},{r.y},{r.width}x{r.height})"
+        )
+        _emit(on_progress, "Removing NotebookLM watermark...", 90)
+        result = remove_watermark(current, nbm_check, config, force_strategy)
+        if result is not None:
+            current = result
+            removed += 1
+            if first_analysis is None:
+                first_analysis = nbm_check
+            gc.collect()
 
     if removed > 1:
         logger.info(f"Multi-pass complete: removed {removed} watermarks")

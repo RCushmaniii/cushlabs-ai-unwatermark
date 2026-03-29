@@ -20,7 +20,7 @@ def remove_watermark(
     analysis: WatermarkAnalysis,
     config: Config | None = None,
     force_strategy: str | None = None,
-) -> Image.Image:
+) -> Image.Image | None:
     """Remove a watermark using the best available technique.
 
     Args:
@@ -30,7 +30,8 @@ def remove_watermark(
         force_strategy: Override the AI's strategy recommendation.
 
     Returns:
-        New PIL Image with the watermark removed.
+        New PIL Image with the watermark removed, or None if removal
+        was skipped (e.g. region too large for safe inpainting).
     """
     if not analysis.watermark_found:
         logger.warning(
@@ -59,7 +60,7 @@ def remove_watermark(
             f"(>{8}% safety limit). Region=({r.x},{r.y},{r.width}x{r.height}), "
             f"desc='{analysis.description}'"
         )
-        return image.copy()
+        return None
 
     technique = get_technique(strategy, config)
     logger.info(
