@@ -40,10 +40,20 @@ def remove_watermark(
         )
         return image.copy()
 
+    # LaMa inpainting is available either locally (simple-lama-inpainting package)
+    # or via Replicate API when the backend is set to "replicate".
+    from unwatermark.config import InpaintBackend
+    inpaint_ok = is_lama_available()
+    if not inpaint_ok and config is not None:
+        inpaint_ok = (
+            config.inpaint_backend == InpaintBackend.REPLICATE
+            and config.has_replicate_token
+        )
+
     strategy = select_strategy(
         analysis,
         force_strategy=force_strategy,
-        inpaint_available=is_lama_available(),
+        inpaint_available=inpaint_ok,
     )
 
     r = analysis.region
