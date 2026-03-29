@@ -136,8 +136,37 @@ Optimized for **corner watermarks** (NotebookLM, copyright text, small logos).
 Not designed for: stock photo tiled patterns, large diagonal overlays, or
 watermarks that cover >25% of the image. The UI should set these expectations.
 
-## Deployment Strategy
-- **Web frontend + API** → Render or Railway ($7-25/mo)
-- **ML inference** → Replicate API (pay per prediction, no model hosting)
-- Florence-2 and SAM available on Replicate — no need to ship large models
-- Vercel/Netlify/Hostinger won't work (can't run Python ML models)
+## Production Deployment — Hetzner VPS
+
+- **Hosted on:** Hetzner VPS (cushlabs-prod-01) via Docker
+- **Host:** `178.156.192.117`
+- **SSH:** `ssh deploy@178.156.192.117`
+- **URL:** https://unwatermark.cushlabs.ai
+- **VPS path:** `~/apps/cushlabs-ai-unwatermark/`
+- **Orchestration:** `~/apps/cushlabs-prod-server/docker-compose.yml`
+- **Domain:** `unwatermark.cushlabs.ai` (HTTPS via Caddy/Let's Encrypt)
+- **Internal port:** 8000 (behind Caddy reverse proxy, bound to `127.0.0.1`)
+- **Database:** None (stateless)
+- **Health check:** `GET /healthz`
+- **ML inference:** Replicate API (pay per prediction, no local model hosting)
+
+### Deploy
+
+```bash
+ssh deploy@178.156.192.117 'cd ~/apps/cushlabs-ai-unwatermark && git pull && cd ~/apps/cushlabs-prod-server && docker compose up -d --build unwatermark'
+```
+
+Code changes require `--build`. Config-only changes (env vars) just need `docker compose restart unwatermark`.
+
+### Logs
+
+```bash
+ssh deploy@178.156.192.117 'docker logs -f unwatermark'
+```
+
+### Vitals
+
+Add to HTML pages:
+```html
+<script src="https://vitals.cushlabs.ai/tracker.js" data-site="unwatermark" defer></script>
+```
