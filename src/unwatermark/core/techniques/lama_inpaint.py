@@ -227,7 +227,7 @@ class LamaInpaintTechnique(RemovalTechnique):
         for attempt in range(max_retries):
             try:
                 output = client.run(
-                    "twn39/lama",
+                    "allenhooo/lama",
                     input={
                         "image": io.BytesIO(img_bytes),
                         "mask": io.BytesIO(mask_bytes),
