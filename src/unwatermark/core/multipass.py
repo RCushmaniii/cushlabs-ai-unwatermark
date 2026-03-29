@@ -241,7 +241,7 @@ def clean_image(
     ).lower()
 
     _notebooklm_hint = UserAnnotation(
-        description="NotebookLM", location="bottom-right"
+        description="NotebookLM watermark in the bottom-right corner"
     )
     if _HAS_EASYOCR:
         nbm_check = detect_watermark_ocr(current, known_text="NotebookLM")
