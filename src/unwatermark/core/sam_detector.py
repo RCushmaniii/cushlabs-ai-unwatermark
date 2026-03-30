@@ -180,15 +180,26 @@ def refine_with_sam(
         logger.warning("Replicate package not installed — skipping SAM refinement")
         return None
 
-    # Keep the prompt simple — Claude Vision already located the watermark,
-    # SAM just needs to segment whatever's in that area.
-    # Overly specific prompts (e.g., "NotebookLM watermark logo text") cause
-    # SAM to match too many objects and produce oversized masks.
     mask_prompt = "watermark text"
 
-    # Encode the full image — JPEG for smaller payload, SAM doesn't need lossless
+    # Crop to the detection region with generous margin — this prevents SAM
+    # from segmenting content text elsewhere in the image. Claude Vision already
+    # told us where the watermark is; SAM just needs to refine the pixel boundary.
+    r = analysis.region
+    margin = max(r.width, r.height)  # 100% margin on all sides
+    crop_x1 = max(0, r.x - margin)
+    crop_y1 = max(0, r.y - margin)
+    crop_x2 = min(image.width, r.x + r.width + margin)
+    crop_y2 = min(image.height, r.y + r.height + margin)
+    crop = image.crop((crop_x1, crop_y1, crop_x2, crop_y2))
+
+    logger.info(
+        f"SAM refinement: cropped to ({crop_x1},{crop_y1})-({crop_x2},{crop_y2}) "
+        f"({crop.width}x{crop.height}) around detection region"
+    )
+
     img_bytes = io.BytesIO()
-    image.convert("RGB").save(img_bytes, format="JPEG", quality=85)
+    crop.convert("RGB").save(img_bytes, format="JPEG", quality=85)
     img_bytes.seek(0)
 
     try:
@@ -201,8 +212,8 @@ def refine_with_sam(
             },
         )
 
-        mask_image = _fetch_mask_output(output)
-        if mask_image is None:
+        crop_mask = _fetch_mask_output(output)
+        if crop_mask is None:
             logger.info("SAM refinement: no mask output")
             return None
 
@@ -210,28 +221,35 @@ def refine_with_sam(
         logger.warning(f"SAM refinement failed: {e}")
         return None
 
-    # Validate the mask
-    mask_arr = np.array(mask_image)
-    white_pixels = np.sum(mask_arr > 128)
-    total_pixels = mask_arr.size
+    # Resize crop mask to match crop dimensions if needed
+    if crop_mask.size != crop.size:
+        crop_mask = crop_mask.resize(crop.size, Image.NEAREST)
+
+    # Validate the crop mask
+    crop_arr = np.array(crop_mask)
+    white_pixels = np.sum(crop_arr > 128)
 
     if white_pixels == 0:
         logger.info("SAM refinement: empty mask — SAM couldn't find the watermark")
         return None
 
-    mask_percent = (white_pixels / total_pixels) * 100
-    if mask_percent > max_mask_percent:
+    crop_mask_percent = (white_pixels / crop_arr.size) * 100
+    # Allow up to 50% of the crop region (which is already small and focused)
+    if crop_mask_percent > 50.0:
         logger.warning(
-            f"SAM refinement: mask too large ({mask_percent:.1f}%) — rejecting"
+            f"SAM refinement: crop mask too large ({crop_mask_percent:.1f}%) — rejecting"
         )
         return None
 
-    # Resize mask to match input image if needed
-    if mask_image.size != image.size:
-        mask_image = mask_image.resize(image.size, Image.NEAREST)
+    # Map cropped mask back to full-image coordinates
+    full_mask = Image.new("L", image.size, 0)
+    full_mask.paste(crop_mask, (crop_x1, crop_y1))
 
-    logger.info(f"SAM refinement: pixel-perfect mask covers {mask_percent:.1f}% of image")
-    return mask_image
+    full_arr = np.array(full_mask)
+    full_percent = (np.sum(full_arr > 128) / full_arr.size) * 100
+    logger.info(f"SAM refinement: pixel-perfect mask covers {full_percent:.1f}% of image")
+
+    return full_mask
 
 
 def _fetch_mask_output(output) -> Image.Image | None:
