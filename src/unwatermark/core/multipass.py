@@ -257,18 +257,31 @@ def clean_image(
 
     if not already_found_nbm and nbm_check is not None and nbm_check.watermark_found:
         r = nbm_check.region
-        logger.info(
-            f"Targeted NotebookLM pass: found '{nbm_check.description}' "
-            f"at ({r.x},{r.y},{r.width}x{r.height})"
-        )
-        _emit(on_progress, "Removing NotebookLM watermark...", 90)
-        result = remove_watermark(current, nbm_check, config, force_strategy)
-        if result is not None:
-            current = result
-            removed += 1
-            if first_analysis is None:
-                first_analysis = nbm_check
-            gc.collect()
+        img_area = current.width * current.height
+        nbm_coverage = (r.width * r.height) / img_area if img_area > 0 else 1.0
+
+        # NotebookLM watermark is tiny (~100x20px = <0.5% of image).
+        # If the detection region is larger than 3%, Claude Vision included
+        # content text in the bounding box — reject to prevent damage.
+        if nbm_coverage > 0.03:
+            logger.warning(
+                f"Targeted NotebookLM pass: region too large "
+                f"({nbm_coverage:.1%} > 3%), skipping to prevent content damage. "
+                f"Region=({r.x},{r.y},{r.width}x{r.height})"
+            )
+        else:
+            logger.info(
+                f"Targeted NotebookLM pass: found '{nbm_check.description}' "
+                f"at ({r.x},{r.y},{r.width}x{r.height}) coverage={nbm_coverage:.1%}"
+            )
+            _emit(on_progress, "Removing NotebookLM watermark...", 90)
+            result = remove_watermark(current, nbm_check, config, force_strategy)
+            if result is not None:
+                current = result
+                removed += 1
+                if first_analysis is None:
+                    first_analysis = nbm_check
+                gc.collect()
 
     if removed > 1:
         logger.info(f"Multi-pass complete: removed {removed} watermarks")
