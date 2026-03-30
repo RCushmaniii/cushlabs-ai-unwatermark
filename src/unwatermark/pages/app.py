@@ -315,9 +315,9 @@ input[type="file"] { display: none; }
       </svg>
     </div>
     <p class="drop-title">Drop your file here or click to browse</p>
-    <p class="drop-formats">PNG, JPG, BMP, TIFF, WebP, PDF, PPTX</p>
-    <p class="drop-size">Max 50 MB</p>
-    <input type="file" id="fileInput" accept=".png,.jpg,.jpeg,.bmp,.tiff,.webp,.pdf,.pptx">
+    <p class="drop-formats">PNG, JPG, BMP, TIFF, WebP, PDF, PPTX, MP4, WebM, MOV</p>
+    <p class="drop-size">Max 100 MB</p>
+    <input type="file" id="fileInput" accept=".png,.jpg,.jpeg,.bmp,.tiff,.webp,.pdf,.pptx,.mp4,.webm,.mov">
   </div>
 </div>
 

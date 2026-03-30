@@ -467,6 +467,30 @@ def _extract_preview(content: bytes, suffix: str) -> Image.Image | None:
             doc.close()
             return image
 
+        elif suffix in (".mp4", ".webm", ".mov"):
+            import subprocess
+            import tempfile
+
+            # Write video to temp file, extract a frame with FFmpeg
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+            frame_path = tmp_path + "_frame.png"
+            try:
+                subprocess.run(
+                    [
+                        "ffmpeg", "-ss", "1", "-i", tmp_path,
+                        "-frames:v", "1", "-q:v", "2", frame_path, "-y",
+                    ],
+                    capture_output=True, timeout=30,
+                )
+                if Path(frame_path).exists():
+                    return Image.open(frame_path).copy()
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+                Path(frame_path).unlink(missing_ok=True)
+            return None
+
     except Exception as e:
         logger.warning(f"Failed to extract preview from {suffix}: {e}")
     return None
