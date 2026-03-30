@@ -208,16 +208,11 @@ def _parse_analysis_json(raw: str, image: Image.Image) -> WatermarkAnalysis:
 
     ctx = data.get("context", {})
 
-    # Diagonal watermarks span the full image — expand to full dimensions
-    # even if the model reported a small bbox (models often report only the
-    # center portion of diagonal text)
+    # Diagonal expansion is DISABLED — it expands small watermarks (like "DRAFT"
+    # in a corner) to full-image dimensions just because Claude used the word
+    # "diagonal", which then gets blocked by the 8% safety guard. Trust the
+    # bounding box from Vision AI instead.
     desc_lower = data.get("description", "").lower()
-    if "diagonal" in desc_lower or "rotated" in desc_lower:
-        logger.info(
-            f"Expanding diagonal watermark region to full image "
-            f"(was {region.x},{region.y},{region.width}x{region.height})"
-        )
-        region = WatermarkRegion(x=0, y=0, width=image.width, height=image.height)
 
     # Padding gives LaMa context around the watermark for cleaner fills.
     # 1.5% is a modest increase from the original 1% — enough to catch
