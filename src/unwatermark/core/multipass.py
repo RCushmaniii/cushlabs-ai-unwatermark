@@ -240,48 +240,48 @@ def clean_image(
         first_analysis.description or ""
     ).lower()
 
-    _notebooklm_hint = UserAnnotation(
-        description="NotebookLM watermark in the bottom-right corner"
-    )
     if _HAS_EASYOCR:
         nbm_check = detect_watermark_ocr(current, known_text="NotebookLM")
-    elif config.can_use_ai:
-        nbm_check = detect_watermark(current, config, _notebooklm_hint)
-        # Only accept if it specifically found NotebookLM (not another watermark)
-        if nbm_check.watermark_found and "notebooklm" not in (
-            nbm_check.description or ""
-        ).lower():
-            nbm_check = None
     else:
-        nbm_check = None
+        # Without OCR, use a fixed bottom-right region for NotebookLM.
+        # NotebookLM watermarks are ALWAYS in the same position: a small
+        # icon + "NotebookLM" text in the bottom-right corner. OCR found
+        # it at (93.5%, 97.3%) with size ~82x14px on 1376x768 slides.
+        # Using a percentage-based region avoids Claude Vision's imprecise
+        # bounding boxes that include nearby content text.
+        from unwatermark.models.analysis import (
+            BackgroundType, RemovalStrategy, WatermarkRegion,
+        )
+        w, h = current.width, current.height
+        nbm_region = WatermarkRegion(
+            x=int(w * 0.88),       # start at 88% from left
+            y=int(h * 0.94),       # start at 94% from top
+            width=int(w * 0.12),   # 12% width (to right edge)
+            height=int(h * 0.06),  # 6% height (to bottom edge)
+        )
+        nbm_check = WatermarkAnalysis(
+            watermark_found=True,
+            region=nbm_region,
+            description="NotebookLM watermark (fixed bottom-right region)",
+            background_type=BackgroundType.MIXED,
+            strategy=RemovalStrategy.INPAINT,
+            confidence=0.8,
+        )
 
     if not already_found_nbm and nbm_check is not None and nbm_check.watermark_found:
         r = nbm_check.region
-        img_area = current.width * current.height
-        nbm_coverage = (r.width * r.height) / img_area if img_area > 0 else 1.0
-
-        # NotebookLM watermark is tiny (~90x15px = ~0.1% of image).
-        # If the detection region is larger than 1%, Claude Vision included
-        # content text in the bounding box — reject to prevent damage.
-        if nbm_coverage > 0.01:
-            logger.warning(
-                f"Targeted NotebookLM pass: region too large "
-                f"({nbm_coverage:.1%} > 1%), skipping to prevent content damage. "
-                f"Region=({r.x},{r.y},{r.width}x{r.height})"
-            )
-        else:
-            logger.warning(
-                f"Targeted NotebookLM pass: removing '{nbm_check.description}' "
-                f"at ({r.x},{r.y},{r.width}x{r.height}) coverage={nbm_coverage:.1%}"
-            )
-            _emit(on_progress, "Removing NotebookLM watermark...", 90)
-            result = remove_watermark(current, nbm_check, config, force_strategy)
-            if result is not None:
-                current = result
-                removed += 1
-                if first_analysis is None:
-                    first_analysis = nbm_check
-                gc.collect()
+        logger.warning(
+            f"Targeted NotebookLM pass: removing at "
+            f"({r.x},{r.y},{r.width}x{r.height})"
+        )
+        _emit(on_progress, "Removing NotebookLM watermark...", 90)
+        result = remove_watermark(current, nbm_check, config, force_strategy)
+        if result is not None:
+            current = result
+            removed += 1
+            if first_analysis is None:
+                first_analysis = nbm_check
+            gc.collect()
 
     if removed > 1:
         logger.info(f"Multi-pass complete: removed {removed} watermarks")
