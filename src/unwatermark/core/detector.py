@@ -85,11 +85,9 @@ def detect_watermark(
     else:
         logger.info("EasyOCR not installed — skipping to AI Vision")
 
-    # NOTE: Florence-2 and Grounded SAM detection layers are disabled.
-    # Claude Vision handles detection reliably, and the Replicate detection
-    # models (Florence-2, SAM) consume rate limit budget that's better
-    # reserved for LaMa inpainting — the one Replicate call that matters.
-    # Re-enable when Replicate rate limits are no longer a constraint.
+    # NOTE: Florence-2 and Grounded SAM standalone detection are disabled.
+    # Claude Vision handles detection reliably. SAM is used only for mask
+    # refinement (upgrading Vision bounding boxes to pixel-perfect masks).
 
     # Layer 4: AI Vision — try primary provider, then fallback to secondary
     # Skipped on pass 2+ re-scans (skip_vision_ai=True) to save cost/time
@@ -98,7 +96,8 @@ def detect_watermark(
         primary_result = analyze_watermark(image, config, annotation)
 
         if primary_result.watermark_found:
-            # Refine AI Vision result with SAM too
+            # Refine bounding box with Lang-SAM for pixel-perfect mask
+            primary_result = _try_sam_refinement(image, primary_result, config)
             return primary_result
 
         # If primary says no watermark AND isn't very confident, try the OTHER
@@ -123,6 +122,7 @@ def detect_watermark(
                     logger.info(
                         f"GPT-4o found watermark: '{secondary_result.description}'"
                     )
+                    secondary_result = _try_sam_refinement(image, secondary_result, config)
                     return secondary_result
             except Exception as e:
                 logger.warning(f"GPT-4o fallback failed: {e}")
@@ -145,6 +145,7 @@ def detect_watermark(
                     logger.info(
                         f"Claude found watermark: '{secondary_result.description}'"
                     )
+                    secondary_result = _try_sam_refinement(image, secondary_result, config)
                     return secondary_result
             except Exception as e:
                 logger.warning(f"Claude fallback failed: {e}")

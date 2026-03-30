@@ -1,14 +1,16 @@
-"""Grounded SAM watermark detection & mask refinement via Replicate.
+"""Lang-SAM watermark detection & mask refinement via Replicate.
 
 Two modes:
-1. **Standalone detection** — Grounding DINO finds watermarks by text prompt,
-   SAM creates pixel-perfect masks. One API call: detection + masking (~$0.003).
-2. **Mask refinement** — Takes an existing bounding box (from Florence-2 or OCR)
-   and generates a pixel-perfect SAM mask for just that region. This is the v2
-   upgrade: precise masks instead of rectangles = no collateral damage to content.
+1. **Standalone detection** — text-prompted segmentation finds watermarks,
+   produces pixel-perfect masks. One API call: detection + masking (~$0.0014).
+2. **Mask refinement** — Takes an existing bounding box (from Claude Vision or OCR)
+   and generates a pixel-perfect mask for just that region. Precise masks instead
+   of rectangles = no collateral damage to content.
 
 Both modes return binary masks (white=watermark, black=keep) that feed directly
 into LaMa inpainting via WatermarkAnalysis.mask.
+
+Uses tmappdev/lang-segment-anything (GroundingDINO + SAM wrapper).
 """
 
 from __future__ import annotations
@@ -28,17 +30,11 @@ from unwatermark.models.analysis import (
 
 logger = logging.getLogger(__name__)
 
-# Grounded SAM model on Replicate (version hash required)
-_GROUNDED_SAM_MODEL = (
-    "schananas/grounded_sam:"
-    "ee871c19efb1941f55f66a3d7d960428c8a5afcb77449547fe8e5a3ab9ebc21c"
+# Lang-SAM model on Replicate (GroundingDINO + SAM, text-prompted segmentation)
+_LANG_SAM_MODEL = (
+    "tmappdev/lang-segment-anything:"
+    "891411c38a6ed2d44c004b7b9e44217df7a5b07848f29ddefd2e28bc7cbf93bc"
 )
-
-# Default prompts to detect watermarks
-_DEFAULT_PROMPTS = [
-    "watermark",
-    "watermark text overlay",
-]
 
 
 def detect_watermark_sam(
@@ -81,36 +77,23 @@ def detect_watermark_sam(
     img_bytes.seek(0)
 
     try:
-        logger.info(f"Grounded SAM: detecting '{mask_prompt}'...")
+        logger.info(f"Lang-SAM: detecting '{mask_prompt}'...")
         output = client.run(
-            _GROUNDED_SAM_MODEL,
+            _LANG_SAM_MODEL,
             input={
                 "image": img_bytes,
-                "mask_prompt": mask_prompt,
-                "adjustment_factor": 0,
+                "text_prompt": mask_prompt,
             },
         )
 
-        # Output is a list of 4 image URLs:
-        # [0] annotated positive mask, [1] annotated negative mask,
-        # [2] binary mask, [3] inverted mask
-        output_list = list(output)
-        if len(output_list) < 3:
-            logger.info("Grounded SAM: no output returned")
+        # Lang-SAM returns a single mask image (FileOutput or URL string)
+        mask_image = _fetch_mask_output(output)
+        if mask_image is None:
+            logger.info("Lang-SAM: no mask output returned")
             return None
 
-        # Get the binary mask (index 2)
-        mask_url = output_list[2]
-        if hasattr(mask_url, "url"):
-            mask_url = mask_url.url
-        mask_url = str(mask_url)
-
-        import urllib.request
-        with urllib.request.urlopen(mask_url) as resp:
-            mask_image = Image.open(io.BytesIO(resp.read())).convert("L")
-
     except Exception as e:
-        logger.warning(f"Grounded SAM detection failed: {e}")
+        logger.warning(f"Lang-SAM detection failed: {e}")
         return None
 
     # Analyze the mask to check if anything was found
@@ -119,15 +102,15 @@ def detect_watermark_sam(
     total_pixels = mask_arr.size
 
     if white_pixels == 0:
-        logger.info("Grounded SAM: mask is empty — no watermark found")
+        logger.info("Lang-SAM: mask is empty — no watermark found")
         return None
 
     mask_percent = (white_pixels / total_pixels) * 100
-    logger.info(f"Grounded SAM: mask covers {mask_percent:.1f}% of image")
+    logger.info(f"Lang-SAM: mask covers {mask_percent:.1f}% of image")
 
     if mask_percent > max_mask_percent:
         logger.warning(
-            f"Grounded SAM: mask too large ({mask_percent:.1f}% > {max_mask_percent}%) — "
+            f"Lang-SAM: mask too large ({mask_percent:.1f}% > {max_mask_percent}%) — "
             "likely false positive, skipping"
         )
         return None
@@ -145,22 +128,22 @@ def detect_watermark_sam(
         height=int(y_max - y_min + 1),
     )
 
-    # Resize mask to match input image if needed (Grounded SAM may resize)
+    # Resize mask to match input image if needed
     if mask_image.size != image.size:
         mask_image = mask_image.resize(image.size, Image.NEAREST)
 
     logger.info(
-        f"Grounded SAM: found watermark at ({region.x},{region.y},{region.width}x{region.height})"
+        f"Lang-SAM: found watermark at ({region.x},{region.y},{region.width}x{region.height})"
     )
 
     return WatermarkAnalysis(
         watermark_found=True,
         region=region,
-        description=f"Grounded SAM: '{mask_prompt}'",
+        description=f"Lang-SAM: '{mask_prompt}'",
         background_type=BackgroundType.MIXED,
         strategy=RemovalStrategy.INPAINT,
         confidence=0.9,
-        reasoning="Grounded SAM pixel-perfect segmentation with LaMa inpainting",
+        reasoning="Lang-SAM pixel-perfect segmentation with LaMa inpainting",
         mask=mask_image,
     )
 
@@ -223,28 +206,17 @@ def refine_with_sam(
     try:
         logger.info(f"SAM refinement: generating pixel mask for '{mask_prompt}'...")
         output = client.run(
-            _GROUNDED_SAM_MODEL,
+            _LANG_SAM_MODEL,
             input={
                 "image": img_bytes,
-                "mask_prompt": mask_prompt,
-                "adjustment_factor": 0,
+                "text_prompt": mask_prompt,
             },
         )
 
-        output_list = list(output)
-        if len(output_list) < 3:
+        mask_image = _fetch_mask_output(output)
+        if mask_image is None:
             logger.info("SAM refinement: no mask output")
             return None
-
-        # Get the binary mask (index 2)
-        mask_url = output_list[2]
-        if hasattr(mask_url, "url"):
-            mask_url = mask_url.url
-        mask_url = str(mask_url)
-
-        import urllib.request
-        with urllib.request.urlopen(mask_url) as resp:
-            mask_image = Image.open(io.BytesIO(resp.read())).convert("L")
 
     except Exception as e:
         logger.warning(f"SAM refinement failed: {e}")
@@ -272,3 +244,39 @@ def refine_with_sam(
 
     logger.info(f"SAM refinement: pixel-perfect mask covers {mask_percent:.1f}% of image")
     return mask_image
+
+
+def _fetch_mask_output(output) -> Image.Image | None:
+    """Fetch the mask image from Lang-SAM's Replicate output.
+
+    Lang-SAM returns a single mask image (FileOutput, URL string, or iterator).
+    Handles all Replicate SDK output variations.
+    """
+    import urllib.request
+
+    # FileOutput object with .read()
+    if hasattr(output, "read"):
+        return Image.open(io.BytesIO(output.read())).convert("L")
+
+    # URL string
+    if isinstance(output, str):
+        with urllib.request.urlopen(output) as resp:
+            return Image.open(io.BytesIO(resp.read())).convert("L")
+
+    # FileOutput with .url attribute
+    if hasattr(output, "url"):
+        with urllib.request.urlopen(str(output.url)) as resp:
+            return Image.open(io.BytesIO(resp.read())).convert("L")
+
+    # Iterator (e.g., list of outputs) — take the first one
+    try:
+        for item in output:
+            if hasattr(item, "read"):
+                return Image.open(io.BytesIO(item.read())).convert("L")
+            url = str(item.url) if hasattr(item, "url") else str(item)
+            with urllib.request.urlopen(url) as resp:
+                return Image.open(io.BytesIO(resp.read())).convert("L")
+    except (TypeError, StopIteration):
+        pass
+
+    return None

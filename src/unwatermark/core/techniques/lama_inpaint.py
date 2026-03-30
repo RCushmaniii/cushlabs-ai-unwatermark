@@ -146,7 +146,7 @@ class LamaInpaintTechnique(RemovalTechnique):
             struct = np.ones((3, 3))
             mask_bool = binary_opening(mask_bool, structure=struct, iterations=1)
             mask_bool = binary_closing(mask_bool, structure=struct, iterations=2)
-            mask_bool = binary_dilation(mask_bool, structure=struct, iterations=3)
+            mask_bool = binary_dilation(mask_bool, structure=struct, iterations=5)
 
             # PROTECT DARK CONTENT TEXT — but only when the region actually
             # contains significant dark content (e.g., a heading overlapping the
