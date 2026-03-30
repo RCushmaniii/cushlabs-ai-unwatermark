@@ -180,23 +180,11 @@ def refine_with_sam(
         logger.warning("Replicate package not installed — skipping SAM refinement")
         return None
 
-    # Build a focused prompt from the detection description
-    desc = (analysis.description or "").lower()
-    if "notebooklm" in desc:
-        mask_prompt = "NotebookLM watermark logo text"
-    elif "shutterstock" in desc:
-        mask_prompt = "Shutterstock watermark text"
-    elif any(kw in desc for kw in ["florence", "ocr", "text watermark"]):
-        # Extract the actual watermark text from descriptions like
-        # "Florence-2 OCR: 'NotebookLM'" or "Text watermark: 'SAMPLE'"
-        import re
-        text_match = re.search(r"'([^']+)'", analysis.description)
-        if text_match:
-            mask_prompt = f"{text_match.group(1)} watermark"
-        else:
-            mask_prompt = "watermark text overlay"
-    else:
-        mask_prompt = "watermark"
+    # Keep the prompt simple — Claude Vision already located the watermark,
+    # SAM just needs to segment whatever's in that area.
+    # Overly specific prompts (e.g., "NotebookLM watermark logo text") cause
+    # SAM to match too many objects and produce oversized masks.
+    mask_prompt = "watermark text"
 
     # Encode the full image — JPEG for smaller payload, SAM doesn't need lossless
     img_bytes = io.BytesIO()
