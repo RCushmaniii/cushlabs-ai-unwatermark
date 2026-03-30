@@ -175,19 +175,32 @@ def _try_sam_refinement(
     if not config.has_replicate_token or _sam_disabled:
         return analysis
 
-    try:
-        mask = refine_with_sam(
-            image,
-            analysis,
-            replicate_api_token=config.replicate_api_token,
-        )
-        if mask is not None:
-            analysis.mask = mask
-            logger.info("SAM refinement: attached pixel-perfect mask")
-        else:
-            logger.info("SAM refinement: no mask produced — using rectangular fallback")
-    except Exception as e:
-        logger.warning(f"SAM refinement error: {e} — disabling for this session")
-        _sam_disabled = True
+    import time
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            mask = refine_with_sam(
+                image,
+                analysis,
+                replicate_api_token=config.replicate_api_token,
+            )
+            if mask is not None:
+                analysis.mask = mask
+                logger.info("SAM refinement: attached pixel-perfect mask")
+            else:
+                logger.info("SAM refinement: no mask produced — using rectangular fallback")
+            break  # success or empty mask — either way, done
+        except Exception as e:
+            if "429" in str(e) and attempt < max_retries - 1:
+                wait = 12 * (attempt + 1)  # 12s, 24s
+                logger.warning(
+                    f"SAM refinement rate limited (attempt {attempt + 1}/{max_retries}), "
+                    f"retrying in {wait}s..."
+                )
+                time.sleep(wait)
+            else:
+                logger.warning(f"SAM refinement error: {e} — disabling for this session")
+                _sam_disabled = True
+                break
 
     return analysis
