@@ -220,9 +220,10 @@ def _parse_analysis_json(raw: str, image: Image.Image) -> WatermarkAnalysis:
         region = WatermarkRegion(x=0, y=0, width=image.width, height=image.height)
 
     # Padding gives LaMa context around the watermark for cleaner fills.
-    # 2% of image dimensions balances coverage vs collateral damage.
-    pad_x = max(10, int(image.width * 0.02))
-    pad_y = max(10, int(image.height * 0.02))
+    # 1.5% is a modest increase from the original 1% — enough to catch
+    # watermark edges without eating into adjacent content text.
+    pad_x = max(8, int(image.width * 0.015))
+    pad_y = max(8, int(image.height * 0.015))
     padded_region = region.padded_xy(pad_x, pad_y, image.width, image.height)
 
     return WatermarkAnalysis(
