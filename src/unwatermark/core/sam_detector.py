@@ -182,11 +182,13 @@ def refine_with_sam(
 
     mask_prompt = "watermark text"
 
-    # Crop to the detection region with generous margin — this prevents SAM
-    # from segmenting content text elsewhere in the image. Claude Vision already
-    # told us where the watermark is; SAM just needs to refine the pixel boundary.
+    # Crop to the detection region with a capped margin — large enough for SAM
+    # to see context around the watermark, but small enough to avoid pulling in
+    # distant content text (which SAM would segment as "watermark text").
     r = analysis.region
-    margin = max(r.width, r.height)  # 100% margin on all sides
+    # 50% of region size, but never more than 3% of image dimension
+    max_margin = int(max(image.width, image.height) * 0.03)
+    margin = min(max(r.width, r.height) // 2, max_margin)
     crop_x1 = max(0, r.x - margin)
     crop_y1 = max(0, r.y - margin)
     crop_x2 = min(image.width, r.x + r.width + margin)

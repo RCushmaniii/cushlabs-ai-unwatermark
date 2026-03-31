@@ -96,6 +96,11 @@ def detect_watermark(
         primary_result = analyze_watermark(image, config, annotation)
 
         if primary_result.watermark_found:
+            # Clamp Vision AI bboxes for known small watermarks — Vision models
+            # often return imprecise bboxes that include nearby content text.
+            primary_result = _clamp_known_watermark_bbox(
+                primary_result, image.width, image.height
+            )
             # Refine bounding box with Lang-SAM for pixel-perfect mask
             primary_result = _try_sam_refinement(image, primary_result, config)
             return primary_result
@@ -122,6 +127,9 @@ def detect_watermark(
                     logger.info(
                         f"GPT-4o found watermark: '{secondary_result.description}'"
                     )
+                    secondary_result = _clamp_known_watermark_bbox(
+                        secondary_result, image.width, image.height
+                    )
                     secondary_result = _try_sam_refinement(image, secondary_result, config)
                     return secondary_result
             except Exception as e:
@@ -145,6 +153,9 @@ def detect_watermark(
                     logger.info(
                         f"Claude found watermark: '{secondary_result.description}'"
                     )
+                    secondary_result = _clamp_known_watermark_bbox(
+                        secondary_result, image.width, image.height
+                    )
                     secondary_result = _try_sam_refinement(image, secondary_result, config)
                     return secondary_result
             except Exception as e:
@@ -154,6 +165,47 @@ def detect_watermark(
 
     # Layer 5: Heuristic fallback
     return _heuristic_fallback(image, annotation)
+
+
+def _clamp_known_watermark_bbox(
+    analysis: WatermarkAnalysis,
+    img_w: int,
+    img_h: int,
+) -> WatermarkAnalysis:
+    """Clamp Vision AI bboxes for known watermark types to prevent content damage.
+
+    Vision models (Claude, GPT-4o) often return imprecise bounding boxes that
+    extend well beyond the actual watermark into nearby content. For known
+    watermark types with predictable positions (e.g., NotebookLM is always a
+    tiny text in the very bottom-right), we clamp the bbox to the expected zone.
+    """
+    from unwatermark.models.analysis import WatermarkRegion
+
+    desc = (analysis.description or "").lower()
+
+    # NotebookLM: always a small text + icon in the bottom ~4% of the image,
+    # right ~20%. Vision AI frequently returns bboxes that include content
+    # text above the actual watermark.
+    if "notebooklm" in desc or "notebook lm" in desc:
+        r = analysis.region
+        # Only clamp if the bbox extends too far up (top edge above 90% of image)
+        min_y = int(img_h * 0.92)
+        if r.y < min_y:
+            old_y, old_h = r.y, r.height
+            new_y = min_y
+            new_h = max(r.height - (min_y - r.y), int(img_h * 0.04))
+            # Don't exceed image bounds
+            if new_y + new_h > img_h:
+                new_h = img_h - new_y
+            analysis.region = WatermarkRegion(
+                x=r.x, y=new_y, width=r.width, height=new_h,
+            )
+            logger.info(
+                f"Clamped NotebookLM bbox: y {old_y}→{new_y}, "
+                f"h {old_h}→{new_h} (bottom {100 - new_y/img_h*100:.0f}% only)"
+            )
+
+    return analysis
 
 
 def _try_sam_refinement(
