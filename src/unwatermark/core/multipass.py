@@ -254,10 +254,10 @@ def clean_image(
         )
         w, h = current.width, current.height
         nbm_region = WatermarkRegion(
-            x=int(w * 0.88),       # start at 88% from left
-            y=int(h * 0.94),       # start at 94% from top
-            width=int(w * 0.12),   # 12% width (to right edge)
-            height=int(h * 0.06),  # 6% height (to bottom edge)
+            x=int(w * 0.78),       # start at 78% from left
+            y=int(h * 0.88),       # start at 88% from top
+            width=int(w * 0.22),   # 22% width (to right edge)
+            height=int(h * 0.12),  # 12% height (to bottom edge)
         )
         nbm_check = WatermarkAnalysis(
             watermark_found=True,
