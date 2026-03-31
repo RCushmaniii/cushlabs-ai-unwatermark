@@ -29,7 +29,7 @@ def page(
 
     # Derive canonical path from active_nav if not explicitly set
     if not canonical_path:
-        _nav_paths = {"home": "/", "app": "/app", "help": "/help", "contact": "/contact"}
+        _nav_paths = {"home": "/", "app": "/app", "help": "/help", "about": "/about", "contact": "/contact"}
         canonical_path = _nav_paths.get(active_nav, "")
     canonical_tag = f'<link rel="canonical" href="{_SITE_URL}{canonical_path}">' if canonical_path else ""
 
@@ -103,6 +103,7 @@ def page(
       <a href="/" class="nav-link{' active' if active_nav == 'home' else ''}">Home</a>
       <a href="/app" class="nav-link{' active' if active_nav == 'app' else ''}">App</a>
       <a href="/help" class="nav-link{' active' if active_nav == 'help' else ''}">Help</a>
+      <a href="/about" class="nav-link{' active' if active_nav == 'about' else ''}">About</a>
       <a href="/contact" class="nav-link{' active' if active_nav == 'contact' else ''}">Contact</a>
     </div>
     <div class="nav-actions">
@@ -116,6 +117,7 @@ def page(
     <a href="/" class="nav-mobile-link{' active' if active_nav == 'home' else ''}">Home</a>
     <a href="/app" class="nav-mobile-link{' active' if active_nav == 'app' else ''}">App</a>
     <a href="/help" class="nav-mobile-link{' active' if active_nav == 'help' else ''}">Help</a>
+    <a href="/about" class="nav-mobile-link{' active' if active_nav == 'about' else ''}">About</a>
     <a href="/contact" class="nav-mobile-link{' active' if active_nav == 'contact' else ''}">Contact</a>
   </div>
 </nav>
@@ -145,6 +147,7 @@ def page(
           <h4 class="footer-col-title">Product</h4>
           <a href="/app">Launch App</a>
           <a href="/help">Help Center</a>
+          <a href="/about">About</a>
         </div>
         <div class="footer-col">
           <h4 class="footer-col-title">Company</h4>

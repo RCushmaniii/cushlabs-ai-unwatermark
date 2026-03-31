@@ -1,3 +1,4 @@
+from unwatermark.pages.about import ABOUT_PAGE
 from unwatermark.pages.app import APP_PAGE
 from unwatermark.pages.contact import CONTACT_PAGE
 from unwatermark.pages.help import HELP_PAGE
@@ -9,6 +10,7 @@ from unwatermark.pages.terms import TERMS_PAGE
 
 __all__ = [
     "page",
+    "ABOUT_PAGE",
     "APP_PAGE",
     "CONTACT_PAGE",
     "HELP_PAGE",

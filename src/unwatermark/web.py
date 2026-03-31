@@ -23,6 +23,7 @@ from unwatermark.core.multipass import constrain_image_size
 from unwatermark.models.analysis import WatermarkRegion
 from unwatermark.models.annotation import UserAnnotation
 from unwatermark.pages import (
+    ABOUT_PAGE,
     APP_PAGE,
     CONTACT_PAGE,
     HELP_PAGE,
@@ -79,6 +80,11 @@ async def help_page():
     return HELP_PAGE
 
 
+@app.get("/about", response_class=HTMLResponse)
+async def about_page():
+    return ABOUT_PAGE
+
+
 @app.get("/contact", response_class=HTMLResponse)
 async def contact_page():
     return CONTACT_PAGE
@@ -125,6 +131,7 @@ _SITEMAP_XML = f"""<?xml version="1.0" encoding="UTF-8"?>
   <url><loc>{_SITE_URL}/</loc><priority>1.0</priority><changefreq>weekly</changefreq></url>
   <url><loc>{_SITE_URL}/app</loc><priority>0.9</priority><changefreq>weekly</changefreq></url>
   <url><loc>{_SITE_URL}/help</loc><priority>0.7</priority><changefreq>monthly</changefreq></url>
+  <url><loc>{_SITE_URL}/about</loc><priority>0.6</priority><changefreq>monthly</changefreq></url>
   <url><loc>{_SITE_URL}/contact</loc><priority>0.5</priority><changefreq>monthly</changefreq></url>
   <url><loc>{_SITE_URL}/terms</loc><priority>0.3</priority><changefreq>yearly</changefreq></url>
   <url><loc>{_SITE_URL}/privacy</loc><priority>0.3</priority><changefreq>yearly</changefreq></url>

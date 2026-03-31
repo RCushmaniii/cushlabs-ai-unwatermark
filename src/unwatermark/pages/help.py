@@ -44,69 +44,6 @@ HELP_PAGE = page("Help Center", """
     color: var(--color-text-secondary);
     line-height: 1.65;
   }
-  .technique-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 1.25rem;
-  }
-  .technique-card {
-    padding: 1.5rem;
-  }
-  .technique-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-sm);
-    background: var(--color-bg-alt);
-    color: var(--color-text-muted);
-    margin-bottom: 1rem;
-  }
-  .technique-name {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--color-text);
-    margin-bottom: 0.4rem;
-  }
-  .technique-desc {
-    font-size: 0.875rem;
-    color: var(--color-text-secondary);
-    line-height: 1.6;
-  }
-  .code-block {
-    background: #0f172a;
-    color: #e2e8f0;
-    border-radius: var(--radius);
-    padding: 1.5rem;
-    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-    font-size: 0.85rem;
-    line-height: 1.7;
-    white-space: pre-wrap;
-    overflow-x: auto;
-  }
-  .code-block .cmd {
-    color: #94a3b8;
-  }
-  .faq-item {
-    padding: 1.5rem 1.75rem;
-  }
-  .faq-item + .faq-item {
-    border-top: 1px solid var(--color-border-light);
-  }
-  .faq-q {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--color-text);
-    margin-bottom: 0.5rem;
-  }
-  .faq-a {
-    font-size: 0.9rem;
-    color: var(--color-text-secondary);
-    line-height: 1.65;
-  }
   .pipeline-card {
     padding: 2rem;
   }
@@ -132,6 +69,67 @@ HELP_PAGE = page("Help Center", """
     color: var(--color-text-faint);
     flex-shrink: 0;
   }
+  .faq-item {
+    padding: 1.5rem 1.75rem;
+  }
+  .faq-item + .faq-item {
+    border-top: 1px solid var(--color-border-light);
+  }
+  .faq-q {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-bottom: 0.5rem;
+  }
+  .faq-a {
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    line-height: 1.65;
+  }
+  .best-for-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+  .best-for-card {
+    padding: 1.5rem;
+  }
+  .best-for-card h3 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .best-for-card ul {
+    list-style: none;
+    padding: 0;
+  }
+  .best-for-card li {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+    padding: 0.3rem 0;
+    padding-left: 1.25rem;
+    position: relative;
+  }
+  .best-for-card li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.65rem;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .best-for-good li::before { background: #22c55e; }
+  .best-for-limited li::before { background: #f59e0b; }
+  @media (max-width: 640px) {
+    .best-for-grid { grid-template-columns: 1fr; }
+  }
 </style>
 
 <div class="page-header">
@@ -141,9 +139,16 @@ HELP_PAGE = page("Help Center", """
 
 <div class="section">
   <h2 class="section-title">How It Works</h2>
-  <p class="section-subtitle">Unwatermark uses a two-stage AI pipeline to remove watermarks from your files.</p>
+  <p class="section-subtitle">Upload a file, and our AI pipeline automatically detects and removes watermarks.</p>
   <div class="card card--flat pipeline-card text-center">
     <div class="pipeline-steps">
+      <div class="pipeline-step">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload
+      </div>
+      <div class="pipeline-arrow">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </div>
       <div class="pipeline-step">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         AI Detection
@@ -153,15 +158,16 @@ HELP_PAGE = page("Help Center", """
       </div>
       <div class="pipeline-step">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-        Local Removal
+        Neural Inpainting
+      </div>
+      <div class="pipeline-arrow">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </div>
+      <div class="pipeline-step">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download
       </div>
     </div>
-  </div>
-  <div class="prose mt-2">
-    <ol>
-      <li><strong>AI Analysis</strong> -- Claude's vision model examines your image to find the watermark, understand what's behind it, and recommend the best removal technique.</li>
-      <li><strong>Local Removal</strong> -- The selected technique runs on the server with no additional API calls. Your files are processed and returned immediately.</li>
-    </ol>
   </div>
 </div>
 
@@ -182,8 +188,8 @@ HELP_PAGE = page("Help Center", """
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       </div>
       <div class="step-card-num">Step 2</div>
-      <div class="step-card-title">Annotate or describe</div>
-      <p>For images, draw a rectangle around the watermark and/or describe it in plain language. For PDFs and PPTX, describe the watermark in the text field. Click Analyze with AI to detect and highlight it.</p>
+      <div class="step-card-title">AI processes your file</div>
+      <p>The detection pipeline automatically scans for watermarks using AI vision analysis. For multi-page files (PDF, PPTX), each page is processed individually with real-time progress updates.</p>
     </div>
 
     <div class="card step-card">
@@ -191,71 +197,53 @@ HELP_PAGE = page("Help Center", """
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
       </div>
       <div class="step-card-num">Step 3</div>
-      <div class="step-card-title">Download result</div>
-      <p>For images, compare before/after with a slider. For documents, download your clean file. Use Try Again to refine, or Start Over for a new file.</p>
+      <div class="step-card-title">Download your clean file</div>
+      <p>For images, compare before and after with an interactive slider. For documents and presentations, download the cleaned file directly. Click Start Over to process another file.</p>
     </div>
   </div>
 </div>
 
 <div class="section">
-  <h2 class="section-title">Removal Techniques</h2>
-  <p class="section-subtitle">The AI automatically selects the best technique for each watermark based on the background.</p>
-  <div class="technique-grid">
-    <div class="card technique-card">
-      <div class="technique-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
-      </div>
-      <div class="technique-name">Solid Fill</div>
-      <p class="technique-desc">Samples the color around the watermark and fills it in. Perfect for watermarks on solid-color backgrounds.</p>
+  <h2 class="section-title">Best Results</h2>
+  <p class="section-subtitle">Unwatermark works best with certain types of watermarks. Here's what to expect.</p>
+  <div class="best-for-grid">
+    <div class="card best-for-card best-for-good">
+      <h3>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Works well
+      </h3>
+      <ul>
+        <li>Small corner watermarks on simple backgrounds</li>
+        <li>Stock photo text overlays (Shutterstock, Getty, etc.)</li>
+        <li>Copyright text and "DRAFT" stamps</li>
+        <li>Watermarks on solid or gradient backgrounds</li>
+        <li>Single-image files (PNG, JPG)</li>
+      </ul>
     </div>
-
-    <div class="card technique-card">
-      <div class="technique-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
-      </div>
-      <div class="technique-name">Gradient Fill</div>
-      <p class="technique-desc">Interpolates colors from all four edges of the watermark region. Works well on gradient backgrounds.</p>
-    </div>
-
-    <div class="card technique-card">
-      <div class="technique-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-      </div>
-      <div class="technique-name">Clone Stamp</div>
-      <p class="technique-desc">Copies pixels from an adjacent area, mirrors them, and blends with a gradient mask. Good for simple textures and patterns.</p>
-    </div>
-
-    <div class="card technique-card">
-      <div class="technique-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7m0-18H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7m0-18v18"/></svg>
-      </div>
-      <div class="technique-name">Inpaint (LaMa)</div>
-      <p class="technique-desc">Uses a state-of-the-art neural inpainting model to reconstruct content behind the watermark. Best for complex backgrounds with text, photos, or diagrams.</p>
+    <div class="card best-for-card best-for-limited">
+      <h3>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        May have limitations
+      </h3>
+      <ul>
+        <li>Small watermarks near dense content text</li>
+        <li>Large diagonal overlays covering the whole image</li>
+        <li>Tiled/repeating watermark patterns</li>
+        <li>Watermarks overlapping complex graphics or photos</li>
+        <li>Multi-page PPTX with varied slide layouts</li>
+      </ul>
     </div>
   </div>
 </div>
 
 <div class="section">
-  <h2 class="section-title">CLI Usage</h2>
-  <p class="section-subtitle">Unwatermark also works as a command-line tool for batch processing.</p>
-  <div class="code-block"><span class="cmd">$</span> unwatermark image.png
-<span class="cmd">$</span> unwatermark presentation.pptx -o clean.pptx
-<span class="cmd">$</span> unwatermark document.pdf --annotate "watermark in bottom-right"
-<span class="cmd">$</span> unwatermark photo.jpg --strategy solid_fill --no-ai</div>
-  <div class="prose mt-2">
-    <p>Run <code>unwatermark --help</code> for all available options.</p>
-  </div>
-</div>
-
-<div class="section">
-  <h2 class="section-title">Tips for Best Results</h2>
+  <h2 class="section-title">Supported Formats</h2>
   <div class="card">
     <div class="prose">
       <ul>
-        <li><strong>Draw a tight rectangle</strong> -- For images, the closer your selection fits the actual watermark, the cleaner the removal. Don't include too much surrounding content.</li>
-        <li><strong>Describe both what and where</strong> -- Use both fields: "What does it look like?" (e.g., "gray NotebookLM text with icon") and "Where is it?" (e.g., "bottom-right corner, white on dark backgrounds"). The more detail you give, the better the AI performs.</li>
-        <li><strong>Mention color variations</strong> -- If the watermark changes color depending on the background (e.g., "white on dark slides, gray on light slides"), mention that. The AI uses this to find it on every page.</li>
-        <li><strong>Use high-res source files</strong> -- Higher resolution images give all techniques more surrounding context to work with.</li>
+        <li><strong>Images</strong> -- PNG, JPG, BMP, TIFF, WebP. Single image files up to 50 MB. Results include a before/after comparison slider.</li>
+        <li><strong>PDF</strong> -- Multi-page documents. Each page is rendered to a high-resolution image, cleaned, and reassembled into a new PDF. Note: vector content is rasterized in this process.</li>
+        <li><strong>PPTX</strong> -- PowerPoint presentations (up to 20 slides). Embedded slide images are processed in-place, preserving all slide layout and formatting.</li>
       </ul>
     </div>
   </div>
@@ -266,16 +254,24 @@ HELP_PAGE = page("Help Center", """
   <div class="card" style="padding: 0; overflow: hidden;">
     <div class="faq-item">
       <div class="faq-q">Is my file sent to the cloud?</div>
-      <p class="faq-a">Your image is sent to Claude's API for analysis only (to detect the watermark). The actual removal happens entirely on the server -- no image data is stored after processing.</p>
+      <p class="faq-a">Your file is sent to AI services for watermark detection (to locate the watermark). The actual removal uses neural inpainting via our processing pipeline. Files are not stored after processing -- they are discarded once you download the result.</p>
     </div>
     <div class="faq-item">
-      <div class="faq-q">What about PDFs and PPTX files?</div>
-      <p class="faq-a">PDFs are rendered to high-resolution images, cleaned, and reassembled. PPTX files have their embedded images processed in-place -- all slide layout, text, and formatting is preserved.</p>
+      <div class="faq-q">Why does processing take a while?</div>
+      <p class="faq-a">The pipeline runs multiple detection passes and neural inpainting for each page. For multi-page files like PPTX, each slide is processed individually. Processing typically takes 15-60 seconds per page depending on complexity.</p>
     </div>
     <div class="faq-item">
-      <div class="faq-q">How does the AI decide which technique to use?</div>
-      <p class="faq-a">Claude's vision model examines the background behind the watermark. Solid backgrounds get a color fill, gradients get interpolated fills, and complex backgrounds (photos, text, diagrams) use LaMa neural inpainting for the best results.</p>
+      <div class="faq-q">What if the watermark isn't fully removed?</div>
+      <p class="faq-a">Some watermarks, especially very small ones near dense content, are difficult to remove cleanly. The pipeline prioritizes preserving your content over aggressive removal -- it's better to leave a trace than to damage the surrounding text or graphics.</p>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Does this work with NotebookLM watermarks?</div>
+      <p class="faq-a">Yes, NotebookLM watermarks are one of the primary use cases. The tool has specific detection logic for the small "NotebookLM" text that appears in the bottom-right corner of exported slides. Results vary depending on how close the watermark is to slide content.</p>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Is this free to use?</div>
+      <p class="faq-a">Yes, completely free. No signup, no account, no usage limits. The tool is a portfolio project by CushLabs AI Services.</p>
     </div>
   </div>
 </div>
-""", active_nav="help", description="Learn how to use Unwatermark — step-by-step guide, removal techniques, CLI usage, and tips for best results.", canonical_path="/help")
+""", active_nav="help", description="Learn how to use Unwatermark -- step-by-step guide, supported formats, best results tips, and frequently asked questions.", canonical_path="/help")
