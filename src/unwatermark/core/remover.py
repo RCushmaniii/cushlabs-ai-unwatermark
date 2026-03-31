@@ -73,7 +73,7 @@ def remove_watermark(
         return None
 
     technique = get_technique(strategy, config)
-    logger.info(
+    logger.warning(
         f"Removing watermark: strategy={strategy.value}, technique={technique.name}, "
         f"region=({r.x},{r.y},{r.width}x{r.height}), image={image.width}x{image.height}"
     )
