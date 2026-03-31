@@ -132,8 +132,20 @@ def process_video(
         patch.save(patch_path, format="PNG")
 
         logger.warning(
-            f"Clean patch: ({region_x},{region_y}) {region_w}x{region_h}"
+            f"Clean patch: ({region_x},{region_y}) {region_w}x{region_h}, "
+            f"patch_size={patch.size}, ref_frame_size={result.image.size}"
         )
+
+        # Verify the patch actually differs from the original (inpainting worked)
+        import numpy as np
+        orig_crop = ref_image.crop((
+            region_x, region_y,
+            region_x + region_w, region_y + region_h,
+        ))
+        diff = np.abs(
+            np.array(orig_crop).astype(float) - np.array(patch).astype(float)
+        ).mean()
+        logger.warning(f"Patch vs original diff: {diff:.1f} (>5 = good)")
 
         # Free PIL images before FFmpeg
         del ref_image, result, patch
@@ -265,6 +277,8 @@ def _composite_video(
         cmd.extend(["-c:a", "copy"])
 
     cmd.extend(["-y", str(output_path)])
+
+    logger.warning(f"FFmpeg overlay cmd: {' '.join(cmd)}")
 
     # Run FFmpeg with progress parsing
     timeout = int(duration * 3) + 60
