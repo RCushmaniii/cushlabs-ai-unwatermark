@@ -89,9 +89,6 @@ def _get_handler(suffix: str):
     elif suffix == ".pptx":
         from unwatermark.handlers.pptx import process_pptx
         return process_pptx
-    elif suffix in (".mp4", ".webm", ".mov"):
-        from unwatermark.handlers.video import process_video
-        return process_video
     return None
 
 
