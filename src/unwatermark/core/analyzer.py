@@ -102,6 +102,43 @@ def _build_prompt(width: int, height: int) -> str:
     return _ANALYSIS_PROMPT_TEMPLATE.replace("WIDTHxHEIGHT", f"{width}x{height}")
 
 
+# Cached reference images (loaded once, reused across calls)
+_reference_images_cache: list[str] | None = None
+
+
+def _get_reference_images() -> list[str]:
+    """Load NotebookLM watermark reference images as base64 strings.
+
+    Returns a list of base64-encoded PNG images, or an empty list if
+    the reference images aren't found (non-fatal — detection still works
+    without them, just less precisely).
+    """
+    global _reference_images_cache
+    if _reference_images_cache is not None:
+        return _reference_images_cache
+
+    from pathlib import Path
+
+    assets_dir = Path(__file__).parent.parent / "assets"
+    ref_files = [
+        assets_dir / "notebooklm_watermark_dark.png",
+        assets_dir / "notebooklm_watermark_light.png",
+    ]
+
+    result = []
+    for ref_path in ref_files:
+        if ref_path.exists():
+            data = ref_path.read_bytes()
+            result.append(base64.standard_b64encode(data).decode("utf-8"))
+        else:
+            logger.debug(f"Reference image not found: {ref_path}")
+
+    _reference_images_cache = result
+    if result:
+        logger.info(f"Loaded {len(result)} NotebookLM watermark reference images")
+    return result
+
+
 def analyze_watermark(
     image: Image.Image,
     config: Config,
@@ -247,7 +284,7 @@ def _parse_analysis_json(raw: str, image: Image.Image) -> WatermarkAnalysis:
 def _analyze_with_claude(
     image: Image.Image, prompt: str, config: Config
 ) -> WatermarkAnalysis:
-    """Send image to Claude for analysis."""
+    """Send image to Claude for analysis, including NotebookLM watermark reference images."""
     import anthropic
 
     client = anthropic.Anthropic(
@@ -256,25 +293,46 @@ def _analyze_with_claude(
     )
     img_b64 = _image_to_base64(image)
 
+    # Build message content: reference images + target image + prompt
+    content = []
+
+    # Include NotebookLM watermark reference images so Claude knows exactly
+    # what to look for — two variants (dark bg with white text, light bg with dark text)
+    ref_images = _get_reference_images()
+    if ref_images:
+        content.append({
+            "type": "text",
+            "text": (
+                "Here are reference images of the NotebookLM watermark "
+                "(appears in two variants — dark and light backgrounds). "
+                "Look for this exact watermark in the target image below:"
+            ),
+        })
+        for ref_b64 in ref_images:
+            content.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/png",
+                    "data": ref_b64,
+                },
+            })
+
+    # Target image to analyze
+    content.append({
+        "type": "image",
+        "source": {
+            "type": "base64",
+            "media_type": "image/jpeg",
+            "data": img_b64,
+        },
+    })
+    content.append({"type": "text", "text": prompt})
+
     message = client.messages.create(
         model=config.analysis_model,
         max_tokens=1024,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "image/jpeg",
-                            "data": img_b64,
-                        },
-                    },
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ],
+        messages=[{"role": "user", "content": content}],
     )
 
     raw_text = message.content[0].text
