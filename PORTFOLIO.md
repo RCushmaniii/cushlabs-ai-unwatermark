@@ -3,7 +3,7 @@
 # PORTFOLIO.MD — Unwatermark
 # =============================================================================
 portfolio_enabled: true
-portfolio_priority: 3
+portfolio_priority: 9
 portfolio_featured: true
 portfolio_last_reviewed: "2026-03-31"
 
