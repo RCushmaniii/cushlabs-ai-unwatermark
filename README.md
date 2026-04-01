@@ -1,51 +1,85 @@
 # Unwatermark
 
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
-![Pillow](https://img.shields.io/badge/Pillow-Image%20Processing-green)
+![EasyOCR](https://img.shields.io/badge/EasyOCR-Text%20Detection-blue)
+![LaMa](https://img.shields.io/badge/LaMa-Neural%20Inpainting-blueviolet)
+![Claude Vision](https://img.shields.io/badge/Claude%20Vision-AI%20Fallback-orange?logo=anthropic)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Web%20UI-009688?logo=fastapi&logoColor=white)
 ![License](https://img.shields.io/badge/License-Proprietary-red)
 
-> AI-powered watermark removal tool for images, PDFs, and PPTX files. Drop a file, get a clean version.
+> AI-powered watermark removal for images, PDFs, and PPTX files. Layered detection pipeline with neural inpainting — drop a file, get a clean version.
+
+<p align="center">
+  <img src="public/images/portfolio/unwatermark-thumb.webp" alt="Unwatermark — AI-powered watermark removal" width="720" />
+</p>
 
 ## Overview
 
-Unwatermark is a focused utility that removes baked-in watermarks from images, PDF documents, and PowerPoint presentations. It was built to solve a specific, recurring problem: exported slide decks (particularly from NotebookLM) embed watermarks directly into the slide images, making them impossible to remove through normal editing.
+Unwatermark detects and removes baked-in watermarks from images, PDF documents, and PowerPoint presentations. It was built to solve a specific problem: tools like NotebookLM export slide decks where every slide is a single PNG with the watermark composited directly into the image — there's no layer to delete.
 
-The tool uses a clone-stamp approach with vertical flip and gradient blending to seamlessly paint over watermark regions. It works as both a CLI tool for batch processing and a drag-and-drop web interface for quick one-off jobs.
+Rather than simple cloning or blurring, Unwatermark uses a **layered AI detection pipeline** paired with **LaMa neural inpainting** to reconstruct the area beneath the watermark while preserving surrounding content.
 
-## The Challenge
+**Live at [unwatermark.cushlabs.ai](https://unwatermark.cushlabs.ai)**
 
-Watermarks baked directly into raster images can't be removed by deleting a layer or element — the watermark pixels replace the original content. This is especially common with:
+## Detection Pipeline
 
-- **NotebookLM exports** — every slide is a single PNG with the watermark composited into the bottom-right corner
-- **Stock photo previews** — watermarks overlaid across the entire image
-- **PDF exports** — watermarks rendered into the page raster
+```
+Image → EasyOCR (text watermarks — free, deterministic, local)
+         ↓ found? → refine with SAM → inpaint
+         ↓ nothing?
+      Florence-2 via Replicate (text + visual detection)
+         ↓ found? → refine with SAM → inpaint
+         ↓ nothing?
+      Grounded SAM (detection + pixel mask in one call)
+         ↓ found? → inpaint
+         ↓ nothing?
+      Claude Vision (legacy fallback for non-standard watermarks)
+         ↓ found? → refine with SAM → inpaint
+         ↓ nothing?
+      Heuristic fallback (position-based guess)
+```
 
-Manual removal in Photoshop works but doesn't scale when you have 14+ slides that all need the same treatment.
+Each detection result is refined through **SAM pixel-perfect masking** to produce a binary mask (white = watermark, black = keep). This feeds directly into LaMa inpainting so only actual watermark pixels are removed — no collateral damage.
 
-## The Solution
+Images go through **up to 3 detect-remove cycles** to catch residual watermarks exposed after the first pass.
 
-Unwatermark automates the clone-stamp technique that a designer would use manually:
+## Screenshots
 
-1. **Detect** the watermark region based on position heuristics (defaults to bottom-right for NotebookLM)
-2. **Clone** a strip of pixels from directly above the watermark area
-3. **Flip** the cloned strip vertically so the edge nearest the watermark blends naturally with surrounding content
-4. **Blend** using a gradient alpha mask that fades at all edges, eliminating hard seams
-5. **Replace** the image data in-place (for PPTX, swaps the blob directly via `image_part._blob`)
+<p align="center">
+  <img src="public/images/portfolio/unwatermark-01.webp" alt="Upload interface" width="360" />
+  <img src="public/images/portfolio/unwatermark-02.webp" alt="Processing progress" width="360" />
+</p>
+<p align="center">
+  <img src="public/images/portfolio/unwatermark-03.webp" alt="Before and after comparison" width="360" />
+  <img src="public/images/portfolio/unwatermark-04.webp" alt="PDF processing" width="360" />
+</p>
+<p align="center">
+  <img src="public/images/portfolio/unwatermark-05.webp" alt="PPTX processing" width="360" />
+  <img src="public/images/portfolio/unwatermark-06.webp" alt="Help page" width="360" />
+</p>
 
-## Technical Highlights
+## Tech Stack
 
-- **Clone-stamp with gradient blending** — mirrors the manual Photoshop technique programmatically, with configurable blend margins
-- **In-place PPTX modification** — replaces image blobs directly inside the PowerPoint package without re-rendering slides
-- **PDF round-trip** — renders pages at configurable DPI via PyMuPDF, processes images, and reassembles a clean PDF
-- **Fallback strategy** — if there isn't enough source material above the watermark, tries below; last resort applies Gaussian blur
-- **Dual interface** — CLI for automation/scripting, FastAPI web UI for drag-and-drop convenience
+| Component | Technology |
+|-----------|-----------|
+| Language | Python 3.10+ |
+| Text Detection | EasyOCR |
+| Visual Detection | Florence-2, Grounded SAM (Replicate) |
+| AI Fallback | Claude Vision (Anthropic SDK) |
+| Inpainting | LaMa (Replicate) |
+| Web Framework | FastAPI + Uvicorn |
+| Image Processing | Pillow, NumPy |
+| PDF Processing | PyMuPDF (fitz) |
+| PPTX Processing | python-pptx |
+| CLI | Click |
+| Deployment | Docker, Caddy, Hetzner VPS |
 
 ## Getting Started
 
 ### Prerequisites
 
 - Python >= 3.10
+- API keys: `ANTHROPIC_API_KEY` (required), `REPLICATE_API_TOKEN` (required for production detection/inpainting)
 
 ### Installation
 
@@ -58,24 +92,12 @@ cd cushlabs-ai-unwatermark
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 
-# Install with CLI support
-pip install -e .
+# Install with all extras
+pip install -e ".[all]"
 
-# Install with web UI support
-pip install -e ".[web]"
-```
-
-### Usage — CLI
-
-```powershell
-# Remove watermark from an image (defaults to bottom-right)
-unwatermark input.png
-
-# Specify output path and watermark position
-unwatermark presentation.pptx -o clean_presentation.pptx --position bottom-right
-
-# Adjust watermark size detection
-unwatermark document.pdf --width-ratio 0.3 --height-ratio 0.08
+# Copy environment config
+cp .env.example .env
+# Edit .env with your API keys
 ```
 
 ### Usage — Web UI
@@ -84,54 +106,61 @@ unwatermark document.pdf --width-ratio 0.3 --height-ratio 0.08
 uvicorn unwatermark.web:app --reload
 ```
 
-Open `http://localhost:8000` — drag and drop a file, adjust settings, download the clean version.
+Open `http://localhost:8000` — drag and drop a file, get a clean version with real-time progress.
+
+### Usage — CLI
+
+```powershell
+# Remove watermark from an image
+unwatermark input.png
+
+# Process a PPTX with annotation hint
+unwatermark presentation.pptx --annotate "NotebookLM watermark bottom-right"
+
+# Skip AI detection (OCR + heuristic only)
+unwatermark document.pdf --no-ai
+```
 
 ## Project Structure
 
 ```
-├── src/
-│   └── unwatermark/
-│       ├── cli.py              # Click CLI entry point
-│       ├── web.py              # FastAPI drag-and-drop interface
-│       ├── core/
-│       │   ├── detector.py     # Watermark region detection
-│       │   └── remover.py      # Clone-stamp removal engine
-│       └── handlers/
-│           ├── image.py        # PNG/JPG/BMP processing
-│           ├── pdf.py          # PDF page extraction and reassembly
-│           └── pptx.py         # PowerPoint image blob replacement
-├── public/
-│   ├── images/                 # Project screenshots and assets
-│   └── video/                  # Demo videos
-├── tests/
-├── pyproject.toml
-└── LICENSE
+src/unwatermark/
+├── cli.py                  # Click CLI entry point
+├── web.py                  # FastAPI web UI (NDJSON streaming progress)
+├── config.py               # API keys, provider/backend selection
+├── core/
+│   ├── ocr_detector.py     # EasyOCR-based detection (primary)
+│   ├── detector.py         # Layered routing: OCR → AI → heuristic
+│   ├── analyzer.py         # Claude Vision / GPT-4o integration
+│   ├── multipass.py        # Multi-pass detect-remove loop
+│   ├── remover.py          # Strategy router → technique dispatch
+│   ├── strategies.py       # Strategy selection (prefers LaMa)
+│   └── techniques/
+│       ├── lama_inpaint.py # LaMa neural inpainting
+│       ├── clone_stamp.py  # Clone-stamp fallback
+│       └── solid_fill.py   # Solid/gradient fill fallback
+├── handlers/
+│   ├── image.py            # Standalone image processing
+│   ├── pdf.py              # PDF render → clean → reassemble
+│   └── pptx.py             # PPTX image blob replacement
+├── models/
+│   ├── analysis.py         # WatermarkAnalysis, WatermarkRegion
+│   └── annotation.py       # UserAnnotation dataclass
+└── pages/
+    └── app.py              # Inline HTML/JS for the web UI
 ```
 
-## Results
+## Scope
 
-The tool was built to process a 14-slide NotebookLM PPTX export where every slide was a single full-size PNG with a watermark baked into the bottom-right corner. The clone-stamp approach produces clean slides that are visually indistinguishable from the original content — no blurring artifacts, no color mismatches at the seam.
-
-| Metric | Detail |
-|--------|--------|
-| Supported formats | PNG, JPG, BMP, TIFF, WebP, PDF, PPTX |
-| Processing time | ~1-2 seconds per slide/page |
-| Blend quality | Seamless gradient — no visible seams |
-| Watermark positions | 6 configurable positions |
+Optimized for **corner watermarks** — NotebookLM, copyright text, small logos. Works well for watermarks covering <25% of the image. Not designed for stock photo tiled patterns or large diagonal overlays across the full image.
 
 ## Contact
 
-**Robert Cushman**
-Business Solution Architect & Full-Stack Developer
+**Robert Cushman** — CushLabs AI Services
 Guadalajara, Mexico
 
-📧 info@cushlabs.ai
-🔗 [GitHub](https://github.com/RCushmaniii) • [LinkedIn](https://linkedin.com/in/robertcushman) • [Portfolio](https://cushlabs.ai)
+[info@cushlabs.ai](mailto:info@cushlabs.ai) | [GitHub](https://github.com/RCushmaniii) | [LinkedIn](https://linkedin.com/in/robertcushman) | [cushlabs.ai](https://cushlabs.ai)
 
 ## License
 
 © 2026 Robert Cushman. All rights reserved.
-
----
-
-*Last Updated: 2026-03-09*
