@@ -30,6 +30,7 @@ def process_pptx(
     annotation: UserAnnotation | None = None,
     force_strategy: str | None = None,
     on_progress: Callable[[str, int], None] | None = None,
+    preview_dir: Path | None = None,
 ) -> Path:
     """Remove watermarks from all images embedded in a PPTX file.
 
@@ -91,6 +92,10 @@ def process_pptx(
                 f"({content_type})"
             )
 
+            # Save "before" preview thumbnail for comparison UI
+            if preview_dir is not None:
+                _save_preview(image, preview_dir / f"before_{slide_idx}.jpg")
+
             # Create a sub-progress callback that prefixes messages with slide info
             # and maps clean_image's 10-95% range into this slide's slice
             def _make_slide_progress(s_num: int, s_total: int, start: int, end: int):
@@ -113,6 +118,9 @@ def process_pptx(
 
             if result.removed == 0:
                 logger.info(f"Slide {slide_num}: no watermarks removed")
+                # Save identical "after" preview for clean slides
+                if preview_dir is not None:
+                    _save_preview(image, preview_dir / f"after_{slide_idx}.jpg")
                 if on_progress:
                     on_progress(f"Slide {slide_num}/{slide_count}: clean", slide_end_pct)
                 continue
@@ -136,9 +144,14 @@ def process_pptx(
                     f"({r.x},{r.y},{r.width}x{r.height})"
                 )
 
+            cleaned = result.image
+
+            # Save "after" preview thumbnail for comparison UI
+            if preview_dir is not None:
+                _save_preview(cleaned, preview_dir / f"after_{slide_idx}.jpg")
+
             buf = io.BytesIO()
             img_format = _content_type_to_format(content_type)
-            cleaned = result.image
             if img_format == "JPEG":
                 cleaned = cleaned.convert("RGB")
             cleaned.save(buf, format=img_format, quality=95)
@@ -191,6 +204,15 @@ def _get_image_part(shape, slide):
     except Exception as e:
         logger.warning(f"Failed to resolve image part: {e}")
         return None
+
+
+def _save_preview(image: Image.Image, path: Path, max_width: int = 1200) -> None:
+    """Save a JPEG preview thumbnail for the comparison UI."""
+    img = image
+    if img.width > max_width:
+        ratio = max_width / img.width
+        img = img.resize((max_width, int(img.height * ratio)), Image.LANCZOS)
+    img.convert("RGB").save(path, format="JPEG", quality=85)
 
 
 def _content_type_to_format(content_type: str) -> str:

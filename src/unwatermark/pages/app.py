@@ -244,48 +244,43 @@ input[type="file"] { display: none; }
 .before-tag { right: 12px; background: rgba(220,38,38,0.85); color: #fff; }
 .after-tag { left: 12px; background: rgba(5,150,105,0.85); color: #fff; }
 
-/* Result card (documents) */
-.result-card {
-  max-width: 520px;
-  margin: 2.5rem auto;
-  text-align: center;
-  background: var(--color-bg);
-  border-radius: var(--radius-lg);
-  padding: 3rem 2.5rem;
-  box-shadow: var(--shadow-md);
+/* Page navigation for multi-page documents */
+.page-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
 }
-.result-icon {
+.page-nav-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: var(--color-success-light);
-  margin-bottom: 1.25rem;
-}
-.result-title {
-  font-family: 'DM Sans', sans-serif;
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: var(--color-text);
-  margin-bottom: 0.5rem;
-  letter-spacing: -0.02em;
-}
-.result-subtitle {
-  color: var(--color-text-muted);
-  font-size: 1rem;
-  margin-bottom: 1.25rem;
-  line-height: 1.5;
-}
-.result-filename {
-  display: inline-block;
-  background: var(--color-bg-alt);
-  border-radius: var(--radius-full);
-  padding: 0.55rem 1.25rem;
-  font-size: 0.9rem;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
   color: var(--color-text-secondary);
-  font-weight: 500;
+}
+.page-nav-btn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+.page-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.page-nav-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  min-width: 100px;
+  text-align: center;
 }
 
 /* Result buttons */
@@ -368,22 +363,37 @@ input[type="file"] { display: none; }
     </div>
   </div>
 
-  <!-- Document result: success card + download -->
+  <!-- Document result: before/after slider with page navigation -->
   <div id="docResult" style="display:none;">
-    <div class="result-card">
-      <div class="result-icon">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>
+    <div class="page-nav" id="pageNav">
+      <button class="page-nav-btn" id="btnPrevPage" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="page-nav-label" id="pageLabel">Page 1 of 1</span>
+      <button class="page-nav-btn" id="btnNextPage" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+    <div class="compare-container" id="docCompareContainer">
+      <img id="docImgBefore" src="" alt="Before">
+      <div class="compare-after" id="docCompareAfter">
+        <img id="docImgAfter" src="" alt="After">
       </div>
-      <h2 class="result-title">Watermarks Removed</h2>
-      <p class="result-subtitle" id="resultSubtitle">Your clean file is ready to download.</p>
-      <div class="result-filename" id="resultFilename"></div>
-      <div class="result-actions" style="margin-top:1.75rem;">
-        <button class="btn btn-secondary" id="btnRestartDoc">Start Over</button>
-        <button class="btn btn-primary btn-lg" id="btnDownloadDoc">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download Clean File
-        </button>
+      <div class="compare-handle" id="docCompareHandle">
+        <div class="compare-handle-line"></div>
+        <div class="compare-handle-grip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M8 5l-5 7 5 7M16 5l5 7-5 7"/></svg>
+        </div>
       </div>
+      <span class="compare-tag before-tag">Before</span>
+      <span class="compare-tag after-tag">After</span>
+    </div>
+    <div class="result-actions" style="margin-top:1.5rem;">
+      <button class="btn btn-secondary" id="btnRestartDoc">Start Over</button>
+      <button class="btn btn-primary btn-lg" id="btnDownloadDoc">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download Clean File
+      </button>
     </div>
   </div>
 </div>
@@ -393,6 +403,9 @@ input[type="file"] { display: none; }
 let uploadedFile = null;
 let cleanBlob = null;
 let isImageFile = false;
+let downloadToken = null;
+let docPageCount = 0;
+let docCurrentPage = 0;
 
 // SVG icons
 const checkSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
@@ -528,7 +541,7 @@ async function doProcess() {
     var reader = resp.body.getReader();
     var decoder = new TextDecoder();
     var buffer = '';
-    var downloadToken = null;
+    downloadToken = null;
 
     while (true) {
       var result = await reader.read();
@@ -545,6 +558,7 @@ async function doProcess() {
           addActivityItem(evt.message, true);
         } else if (evt.type === 'complete') {
           downloadToken = evt.download_token;
+          docPageCount = evt.page_count || 0;
           fill.style.width = '100%';
           markAllDone();
           addActivityItem('Processing complete', false);
@@ -572,11 +586,13 @@ async function doProcess() {
 
 // Result
 function showResult() {
-  if (!isImageFile) {
-    // Document: show success card
+  if (!isImageFile && docPageCount > 0) {
+    // Document: show before/after slider with page navigation
     document.getElementById('imageResult').style.display = 'none';
     document.getElementById('docResult').style.display = 'block';
-    document.getElementById('resultFilename').textContent = 'clean_' + uploadedFile.name;
+    docCurrentPage = 0;
+    updatePageNav();
+    loadDocPage(0);
     showStep('result');
     return;
   }
@@ -592,15 +608,56 @@ function showResult() {
   beforeImg.onload = function() {
     afterImg.style.width = beforeImg.clientWidth + 'px';
     showStep('result');
-    initCompareSlider();
+    initCompareSlider('compareContainer', 'compareAfter', 'compareHandle');
   };
 }
 
-function initCompareSlider() {
-  var container = document.getElementById('compareContainer');
-  var afterDiv = document.getElementById('compareAfter');
-  var handle = document.getElementById('compareHandle');
-  var isDragging = false;
+// Document page navigation
+function updatePageNav() {
+  var label = document.getElementById('pageLabel');
+  var fileType = /\\.pptx$/i.test(uploadedFile.name) ? 'Slide' : 'Page';
+  label.textContent = fileType + ' ' + (docCurrentPage + 1) + ' of ' + docPageCount;
+  document.getElementById('btnPrevPage').disabled = docCurrentPage <= 0;
+  document.getElementById('btnNextPage').disabled = docCurrentPage >= docPageCount - 1;
+}
+
+function loadDocPage(pageIdx) {
+  var beforeImg = document.getElementById('docImgBefore');
+  var afterImg = document.getElementById('docImgAfter');
+  var beforeUrl = '/preview/' + downloadToken + '/before/' + pageIdx;
+  var afterUrl = '/preview/' + downloadToken + '/after/' + pageIdx;
+  beforeImg.src = beforeUrl;
+  afterImg.src = afterUrl;
+  beforeImg.onload = function() {
+    afterImg.style.width = beforeImg.clientWidth + 'px';
+    initCompareSlider('docCompareContainer', 'docCompareAfter', 'docCompareHandle');
+  };
+}
+
+document.getElementById('btnPrevPage').addEventListener('click', function() {
+  if (docCurrentPage > 0) {
+    docCurrentPage--;
+    updatePageNav();
+    loadDocPage(docCurrentPage);
+  }
+});
+
+document.getElementById('btnNextPage').addEventListener('click', function() {
+  if (docCurrentPage < docPageCount - 1) {
+    docCurrentPage++;
+    updatePageNav();
+    loadDocPage(docCurrentPage);
+  }
+});
+
+// Generic compare slider — works for both image and document results
+// Track active slider state to avoid stacking document-level listeners
+var activeSlider = null;
+
+function initCompareSlider(containerId, afterId, handleId) {
+  var container = document.getElementById(containerId);
+  var afterDiv = document.getElementById(afterId);
+  var handle = document.getElementById(handleId);
 
   function setPosition(clientX) {
     var rect = container.getBoundingClientRect();
@@ -609,20 +666,37 @@ function initCompareSlider() {
     handle.style.left = (pct * 100) + '%';
   }
 
+  // Store as active slider so document-level handlers use the right elements
+  activeSlider = { container: container, setPosition: setPosition, isDragging: false };
+
   requestAnimationFrame(function() {
     var rect = container.getBoundingClientRect();
     setPosition(rect.left + rect.width / 2);
   });
 
-  handle.addEventListener('mousedown', function(e) { isDragging = true; e.preventDefault(); });
-  document.addEventListener('mousemove', function(e) { if (isDragging) setPosition(e.clientX); });
-  document.addEventListener('mouseup', function() { isDragging = false; });
-  container.addEventListener('click', function(e) { setPosition(e.clientX); });
+  // Remove old element-level listeners by cloning
+  var newHandle = handle.cloneNode(true);
+  handle.parentNode.replaceChild(newHandle, handle);
+  handle = newHandle;
 
-  handle.addEventListener('touchstart', function(e) { isDragging = true; e.preventDefault(); }, { passive: false });
-  document.addEventListener('touchmove', function(e) { if (isDragging) setPosition(e.touches[0].clientX); });
-  document.addEventListener('touchend', function() { isDragging = false; });
+  handle.addEventListener('mousedown', function(e) { activeSlider.isDragging = true; e.preventDefault(); });
+  container.addEventListener('click', function(e) { activeSlider.setPosition(e.clientX); });
+  handle.addEventListener('touchstart', function(e) { activeSlider.isDragging = true; e.preventDefault(); }, { passive: false });
 }
+
+// Single set of document-level listeners for drag handling
+document.addEventListener('mousemove', function(e) {
+  if (activeSlider && activeSlider.isDragging) activeSlider.setPosition(e.clientX);
+});
+document.addEventListener('mouseup', function() {
+  if (activeSlider) activeSlider.isDragging = false;
+});
+document.addEventListener('touchmove', function(e) {
+  if (activeSlider && activeSlider.isDragging) activeSlider.setPosition(e.touches[0].clientX);
+});
+document.addEventListener('touchend', function() {
+  if (activeSlider) activeSlider.isDragging = false;
+});
 
 function triggerDownload() {
   var url = URL.createObjectURL(cleanBlob);
@@ -636,7 +710,8 @@ document.getElementById('btnDownloadDoc').addEventListener('click', triggerDownl
 
 function doRestart() {
   uploadedFile = null; cleanBlob = null;
-  isImageFile = false;
+  isImageFile = false; downloadToken = null;
+  docPageCount = 0; docCurrentPage = 0;
   fileInput.value = '';
   document.getElementById('activityFeed').innerHTML = '';
   document.getElementById('processingError').innerHTML = '';

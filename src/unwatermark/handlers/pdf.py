@@ -27,6 +27,7 @@ def process_pdf(
     force_strategy: str | None = None,
     dpi: int = 150,
     on_progress: Callable[[str, int], None] | None = None,
+    preview_dir: Path | None = None,
 ) -> Path:
     """Remove watermarks from a PDF by rendering pages, cleaning, and reassembling.
 
@@ -79,6 +80,10 @@ def process_pdf(
         # Free the pixmap immediately — PIL now owns the pixel data
         del pix
 
+        # Save "before" preview thumbnail for comparison UI
+        if preview_dir is not None:
+            _save_preview(image, preview_dir / f"before_{page_idx}.jpg")
+
         # Create a sub-progress callback that prefixes messages with page info
         # and maps clean_image's 10-95% range into this page's slice
         def _make_page_progress(pg_num: int, pg_total: int, start: int, end: int):
@@ -114,6 +119,10 @@ def process_pdf(
 
         cleaned = result.image.convert("RGB")
 
+        # Save "after" preview thumbnail for comparison UI
+        if preview_dir is not None:
+            _save_preview(cleaned, preview_dir / f"after_{page_idx}.jpg")
+
         buf = io.BytesIO()
         cleaned.save(buf, format="JPEG", quality=95)
         jpeg_bytes = buf.getvalue()
@@ -138,3 +147,12 @@ def process_pdf(
         on_progress("Done", 100)
 
     return output_path
+
+
+def _save_preview(image: Image.Image, path: Path, max_width: int = 1200) -> None:
+    """Save a JPEG preview thumbnail for the comparison UI."""
+    img = image
+    if img.width > max_width:
+        ratio = max_width / img.width
+        img = img.resize((max_width, int(img.height * ratio)), Image.LANCZOS)
+    img.convert("RGB").save(path, format="JPEG", quality=85)

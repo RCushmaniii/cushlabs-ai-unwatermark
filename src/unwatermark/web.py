@@ -308,6 +308,13 @@ async def process_file(
     _det._florence_disabled = False
     output_path = input_path.with_stem(input_path.stem + "_clean")
     original_filename = file.filename or "file"
+    is_document = suffix in (".pdf", ".pptx")
+
+    # For documents, create a preview directory for before/after comparison images
+    preview_dir: Path | None = None
+    if is_document:
+        preview_dir = _DOWNLOAD_DIR / f"previews_{uuid.uuid4().hex[:8]}"
+        preview_dir.mkdir(exist_ok=True)
 
     # Progress state shared between the processing thread and the generator
     progress_events: list[dict] = []
@@ -326,6 +333,7 @@ async def process_file(
             handler(
                 input_path, output_path, config, annotation, force_strategy,
                 on_progress=on_progress,
+                **({"preview_dir": preview_dir} if preview_dir else {}),
             )
             logger.info(f"Handler completed. Output exists: {output_path.exists()}")
         except Exception as e:
@@ -365,9 +373,18 @@ async def process_file(
                 token = str(uuid.uuid4())[:8]
                 # Persist token mapping to disk so it survives server reloads
                 meta = {"path": str(output_path), "name": f"clean_{original_filename}"}
+                # Include preview info for document comparison UI
+                if preview_dir is not None:
+                    meta["preview_dir"] = str(preview_dir)
+                    # Count how many pages were processed
+                    page_count = len(list(preview_dir.glob("before_*.jpg")))
+                    meta["page_count"] = page_count
                 (_DOWNLOAD_DIR / f"{token}.json").write_text(json.dumps(meta))
                 logger.info(f"Download ready: token={token}, path={output_path}")
-                yield json.dumps({"type": "complete", "download_token": token}) + "\n"
+                complete_evt: dict = {"type": "complete", "download_token": token}
+                if preview_dir is not None:
+                    complete_evt["page_count"] = meta.get("page_count", 0)
+                yield json.dumps(complete_evt) + "\n"
 
     return StreamingResponse(guarded_stream(), media_type="application/x-ndjson")
 
@@ -390,11 +407,31 @@ async def download_file(token: str):
         return JSONResponse({"error": "Download expired or not found."}, status_code=404)
 
     logger.info(f"Serving download: {path} ({path.stat().st_size} bytes) as {name}")
-    # Clean up meta file after serving
-    meta_file.unlink(missing_ok=True)
     return FileResponse(
         path=str(path), filename=name, media_type="application/octet-stream"
     )
+
+
+@app.get("/preview/{token}/{side}/{page}")
+async def preview_page(token: str, side: str, page: int):
+    """Serve a before/after preview image for a processed document page."""
+    if side not in ("before", "after"):
+        return JSONResponse({"error": "Invalid side, use 'before' or 'after'."}, status_code=400)
+
+    meta_file = _DOWNLOAD_DIR / f"{token}.json"
+    if not meta_file.exists():
+        return JSONResponse({"error": "Preview expired or not found."}, status_code=404)
+
+    meta = json.loads(meta_file.read_text())
+    preview_dir = meta.get("preview_dir")
+    if not preview_dir:
+        return JSONResponse({"error": "No previews available."}, status_code=404)
+
+    image_path = Path(preview_dir) / f"{side}_{page}.jpg"
+    if not image_path.exists():
+        return JSONResponse({"error": f"Page {page} not found."}, status_code=404)
+
+    return FileResponse(path=str(image_path), media_type="image/jpeg")
 
 
 # ---------------------------------------------------------------------------
