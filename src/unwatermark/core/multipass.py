@@ -17,7 +17,7 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from PIL import Image
+from PIL import Image, ImageFilter
 
 from unwatermark.config import Config
 from unwatermark.core.detector import detect_watermark
@@ -285,6 +285,25 @@ def clean_image(
 
     if removed > 1:
         logger.info(f"Multi-pass complete: removed {removed} watermarks")
+
+    # Final polish: apply a light Gaussian blur to the watermark region to
+    # smudge out any faint remnants that inpainting didn't fully eliminate.
+    if removed > 0 and first_analysis is not None:
+        r = first_analysis.region
+        # Expand the blur region slightly (10% padding) to catch edge artifacts
+        pad_x = int(r.width * 0.10)
+        pad_y = int(r.height * 0.10)
+        x1 = max(0, r.x - pad_x)
+        y1 = max(0, r.y - pad_y)
+        x2 = min(current.width, r.x + r.width + pad_x)
+        y2 = min(current.height, r.y + r.height + pad_y)
+
+        region_crop = current.crop((x1, y1, x2, y2))
+        blurred = region_crop.filter(ImageFilter.GaussianBlur(radius=2))
+        current.paste(blurred, (x1, y1))
+        logger.info(
+            f"Applied blur polish to region ({x1},{y1})-({x2},{y2})"
+        )
 
     _emit(on_progress, "Watermark removal complete", 95)
 
