@@ -105,6 +105,25 @@ async def favicon():
     return Response(content=FAVICON_SVG, media_type="image/svg+xml")
 
 
+@app.get("/og-image.png")
+async def og_image():
+    """Generate a branded Open Graph image (1200x630) on the fly."""
+    img = Image.new("RGB", (1200, 630), color=(37, 99, 235))
+    # Dark gradient band at bottom
+    from PIL import ImageDraw
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([(0, 420), (1200, 630)], fill=(15, 23, 42))
+    # Title text
+    draw.text((80, 180), "Unwatermark", fill=(255, 255, 255))
+    draw.text((80, 260), "AI-Powered Watermark Removal", fill=(200, 220, 255))
+    draw.text((80, 470), "Images  |  PDFs  |  Presentations", fill=(148, 163, 184))
+    draw.text((80, 530), "cushlabs.ai", fill=(96, 165, 250))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return Response(content=buf.getvalue(), media_type="image/png")
+
+
 @app.get("/healthz")
 async def healthz():
     """Health check endpoint — used by external ping services to keep the server warm."""

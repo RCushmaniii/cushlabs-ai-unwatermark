@@ -50,12 +50,14 @@ def page(
 <meta property="og:site_name" content="{_SITE_NAME}">
 <meta property="og:title" content="{full_title}">
 <meta property="og:description" content="{meta_desc}">
+<meta property="og:image" content="{_SITE_URL}/og-image.png">
 {f'<meta property="og:url" content="{_SITE_URL}{canonical_path}">' if canonical_path else ""}
 
 <!-- Twitter Card -->
-<meta name="twitter:card" content="summary">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{full_title}">
 <meta name="twitter:description" content="{meta_desc}">
+<meta name="twitter:image" content="{_SITE_URL}/og-image.png">
 
 <link rel="icon" href="/favicon.ico" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -180,6 +182,7 @@ def page(
 }})();
 </script>
 
+<script src="https://vitals.cushlabs.ai/tracker.js" data-site="unwatermark" defer></script>
 </body>
 </html>"""
 
@@ -764,6 +767,16 @@ textarea.control-input { resize: vertical; min-height: 120px; }
 }
 
 /* ---- Reduced Motion ---- */
+/* ---- Focus Visible ---- */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.3);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
