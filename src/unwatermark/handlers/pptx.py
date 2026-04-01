@@ -62,6 +62,8 @@ def process_pptx(
 
     # Baseline from first successful detection — reused when detection fails
     baseline_analysis: WatermarkAnalysis | None = None
+    # Sequential counter for preview files (only increments when a slide has images)
+    preview_idx = 0
 
     for slide_idx, slide in enumerate(prs.slides):
         slide_num = slide_idx + 1
@@ -94,7 +96,7 @@ def process_pptx(
 
             # Save "before" preview thumbnail for comparison UI
             if preview_dir is not None:
-                _save_preview(image, preview_dir / f"before_{slide_idx}.jpg")
+                _save_preview(image, preview_dir / f"before_{preview_idx}.jpg")
 
             # Create a sub-progress callback that prefixes messages with slide info
             # and maps clean_image's 10-95% range into this slide's slice
@@ -120,7 +122,8 @@ def process_pptx(
                 logger.info(f"Slide {slide_num}: no watermarks removed")
                 # Save identical "after" preview for clean slides
                 if preview_dir is not None:
-                    _save_preview(image, preview_dir / f"after_{slide_idx}.jpg")
+                    _save_preview(image, preview_dir / f"after_{preview_idx}.jpg")
+                    preview_idx += 1
                 if on_progress:
                     on_progress(f"Slide {slide_num}/{slide_count}: clean", slide_end_pct)
                 continue
@@ -148,7 +151,8 @@ def process_pptx(
 
             # Save "after" preview thumbnail for comparison UI
             if preview_dir is not None:
-                _save_preview(cleaned, preview_dir / f"after_{slide_idx}.jpg")
+                _save_preview(cleaned, preview_dir / f"after_{preview_idx}.jpg")
+                preview_idx += 1
 
             buf = io.BytesIO()
             img_format = _content_type_to_format(content_type)
