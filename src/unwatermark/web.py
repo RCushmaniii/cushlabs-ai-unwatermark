@@ -6,18 +6,25 @@ import asyncio
 import io
 import json
 import logging
+import os
+import sys
 import tempfile
 import threading
 import uuid
 from pathlib import Path
 
+import sentry_sdk
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.exceptions import HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from PIL import Image
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from unwatermark.cli import _get_handler
-from unwatermark.config import load_config
+from unwatermark.config import load_config, validate_env
 from unwatermark.core.detector import detect_watermark
 from unwatermark.core.multipass import constrain_image_size
 from unwatermark.models.analysis import WatermarkRegion
@@ -33,9 +40,96 @@ from unwatermark.pages import (
     TERMS_PAGE,
 )
 
+# ---------------------------------------------------------------------------
+# Structured logging
+# ---------------------------------------------------------------------------
+
+def _configure_logging() -> None:
+    """Configure JSON structured logging for production, human-readable for dev."""
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    handler = logging.StreamHandler(sys.stderr)
+    if os.getenv("ENVIRONMENT", "production") == "development":
+        fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    else:
+        fmt = logging.Formatter(
+            '{"time":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","message":"%(message)s"}'
+        )
+    handler.setFormatter(fmt)
+    root.handlers = [handler]
+
+
+_configure_logging()
 logger = logging.getLogger(__name__)
 
+
+# ---------------------------------------------------------------------------
+# Env validation (fail fast on missing required vars)
+# ---------------------------------------------------------------------------
+
+validate_env()
+
+
+# ---------------------------------------------------------------------------
+# Sentry error monitoring
+# ---------------------------------------------------------------------------
+
+_sentry_dsn = os.getenv("SENTRY_DSN", "")
+if _sentry_dsn:
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        traces_sample_rate=0.1,
+        environment=os.getenv("ENVIRONMENT", "production"),
+    )
+    logger.info("Sentry initialized")
+else:
+    logger.warning("SENTRY_DSN not set — error reporting disabled")
+
+
+# ---------------------------------------------------------------------------
+# App init
+# ---------------------------------------------------------------------------
+
 app = FastAPI(title="Unwatermark", description="AI-powered watermark removal")
+
+
+# ---------------------------------------------------------------------------
+# Security headers middleware
+# ---------------------------------------------------------------------------
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-DNS-Prefetch-Control"] = "off"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+        )
+        if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting
+# ---------------------------------------------------------------------------
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        {"error": "Rate limit exceeded. Please wait and try again."},
+        status_code=429,
+        headers={"Retry-After": str(exc.detail)},
+    )
 
 # Inline SVG favicon — eye-off icon matching the brand
 FAVICON_SVG = (
@@ -173,7 +267,9 @@ async def sitemap_xml():
 # ---------------------------------------------------------------------------
 
 @app.post("/analyze")
+@limiter.limit("20/minute")
 async def analyze_file(
+    request: Request,
     file: UploadFile = File(...),
     description: str = Form(""),
     location: str = Form(""),
@@ -275,7 +371,9 @@ async def analyze_file(
 
 
 @app.post("/process")
+@limiter.limit("10/minute")
 async def process_file(
+    request: Request,
     file: UploadFile = File(...),
     description: str = Form(""),
     location: str = Form(""),
