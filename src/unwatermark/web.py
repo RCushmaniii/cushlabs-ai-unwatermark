@@ -124,7 +124,7 @@ async def og_image():
     return Response(content=buf.getvalue(), media_type="image/png")
 
 
-@app.get("/healthz")
+@app.api_route("/healthz", methods=["GET", "HEAD"])
 async def healthz():
     """Health check endpoint — used by external ping services to keep the server warm."""
     return JSONResponse({"status": "ok"})
