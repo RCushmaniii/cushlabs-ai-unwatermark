@@ -26,6 +26,7 @@ web = [
     "fastapi>=0.104",
     "uvicorn>=0.24",
     "python-multipart>=0.0.6",
+    "slowapi>=0.1.9",
 ]
 openai = [
     "openai>=1.50",
@@ -39,6 +40,7 @@ replicate = [
 # Lightweight deploy: web + replicate + openai (no PyTorch, fits in 512MB RAM)
 deploy = [
     "unwatermark[web,replicate,openai]",
+    "sentry-sdk[fastapi]>=2.0",
 ]
 # Full local install: everything including local ML models
 all = [

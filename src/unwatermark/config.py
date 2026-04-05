@@ -102,6 +102,34 @@ def get_replicate_client(api_token: str | None = None):
         raise RuntimeError("Replicate package not installed. Install with: pip install replicate")
 
 
+def validate_env() -> None:
+    """Validate required environment variables at startup. Warns on missing optional vars."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # Required: at least one API key for the detection pipeline
+    has_anthropic = bool(os.getenv("ANTHROPIC_API_KEY", ""))
+    has_replicate = bool(os.getenv("REPLICATE_API_TOKEN", "") or os.getenv("REPLICATE_API", ""))
+
+    if not has_anthropic and not has_replicate:
+        logger.error(
+            "No API keys configured. Set ANTHROPIC_API_KEY and/or REPLICATE_API_TOKEN in .env"
+        )
+        raise SystemExit(1)
+
+    if not has_anthropic:
+        logger.warning("ANTHROPIC_API_KEY not set — Claude Vision fallback disabled")
+    if not has_replicate:
+        logger.warning(
+            "REPLICATE_API_TOKEN not set — Florence-2, SAM, and LaMa via Replicate disabled"
+        )
+
+    # Optional but recommended
+    if not os.getenv("SENTRY_DSN", ""):
+        logger.warning("SENTRY_DSN not set — error reporting disabled")
+
+
 def load_config(**overrides) -> Config:
     """Load config from environment variables, with optional overrides."""
     config = Config(
