@@ -4,7 +4,7 @@
 # =============================================================================
 portfolio_enabled: true
 portfolio_priority: 9
-portfolio_featured: true
+portfolio_featured: false
 portfolio_last_reviewed: "2026-03-31"
 
 title: "Unwatermark"
@@ -89,19 +89,6 @@ health_status:
   dependabot: "Y"
   secret_scanning: "Y"
   db_backup: "-"
-health_status:
-  sentry: "Y"
-  testing: "Y"
-  ci_cd: "Y"
-  health_endpoint: "Y"
-  security_headers: "Y"
-  rate_limiting: "Y"
-  env_validation: "Y"
-  analytics: "DEFERRED"
-  structured_logging: "Y"
-  dependabot: "Y"
-  secret_scanning: "Y"
-  db_backup: "N/A"
 ---
 
 ## Overview
