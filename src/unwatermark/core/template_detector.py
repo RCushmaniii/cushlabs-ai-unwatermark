@@ -33,15 +33,26 @@ logger = logging.getLogger(__name__)
 _TEMPLATES_DIR = Path(__file__).parent.parent / "assets"
 
 # Minimum normalized cross-correlation score for a valid match (0.0-1.0).
-# 0.65 is a practical threshold for anti-aliased text templates matched against
-# real-world slide backgrounds — the score drops because the *background* around
-# the glyphs varies even when the glyphs themselves are identical.
+# 0.65 is practical for anti-aliased text templates against real-world slide
+# backgrounds — the mean-subtracting CCOEFF metric tolerates modest background
+# variation. False positives are suppressed primarily by the bottom-right
+# search-zone restriction, not by a tight threshold.
 _MATCH_THRESHOLD = 0.65
 
 # Template scale factors to search. NotebookLM watermarks render at nearly
 # constant pixel size across typical slide resolutions, but we sweep a range
 # to handle downscaled PDFs and higher-res exports.
 _SCALES = (0.6, 0.75, 0.9, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0)
+
+# NotebookLM watermarks are always rendered in the bottom-right corner of the
+# generated slide — never the middle, never the left side. Constraining the
+# search to that quadrant eliminates false positives on unrelated text that
+# happens to have similar cross-correlation (headings, bullet points, etc.)
+# which previously caused content-damaging inpaints in the middle of slides.
+# These fractions define the minimum x/y (as a fraction of image size) where
+# the match *top-left corner* can land.
+_SEARCH_X_MIN_FRAC = 0.60
+_SEARCH_Y_MIN_FRAC = 0.80
 
 # Templates live inside the distributed package (src/unwatermark/assets/).
 _TEMPLATE_SPECS: tuple[tuple[str, str, str], ...] = (
@@ -113,6 +124,20 @@ def detect_watermark_template(image: Image.Image) -> WatermarkAnalysis | None:
     img_gray = cv2.cvtColor(img_arr, cv2.COLOR_RGB2GRAY)
     img_h, img_w = img_gray.shape
 
+    # Crop to the bottom-right search zone before matching. NotebookLM
+    # watermarks live only in this quadrant; searching elsewhere yields false
+    # positives on unrelated text (bullets, headings) that happen to have
+    # similar pixel structure.
+    x_offset = int(img_w * _SEARCH_X_MIN_FRAC)
+    y_offset = int(img_h * _SEARCH_Y_MIN_FRAC)
+    search_region = img_gray[y_offset:img_h, x_offset:img_w]
+    search_h, search_w = search_region.shape
+    if search_h < 10 or search_w < 10:
+        logger.info(
+            f"Template matching: search zone too small ({search_w}x{search_h}) — skipping"
+        )
+        return None
+
     # Track the best match across all (template, scale) pairs.
     best: tuple[float, str, int, int, int, int, np.ndarray] | None = None
 
@@ -124,7 +149,7 @@ def detect_watermark_template(image: Image.Image) -> WatermarkAnalysis | None:
             new_h = int(round(t_h * scale))
             if new_w < 10 or new_h < 5:
                 continue
-            if new_w > img_w or new_h > img_h:
+            if new_w > search_w or new_h > search_h:
                 continue
 
             scaled = cv2.resize(
@@ -134,11 +159,14 @@ def detect_watermark_template(image: Image.Image) -> WatermarkAnalysis | None:
                 template_mask, (new_w, new_h), interpolation=cv2.INTER_NEAREST
             )
 
-            result = cv2.matchTemplate(img_gray, scaled, cv2.TM_CCOEFF_NORMED)
+            result = cv2.matchTemplate(search_region, scaled, cv2.TM_CCOEFF_NORMED)
             _, max_val, _, max_loc = cv2.minMaxLoc(result)
 
             if max_val >= _MATCH_THRESHOLD and (best is None or max_val > best[0]):
-                x, y = max_loc
+                # Translate search-region coordinates back into full-image coords.
+                local_x, local_y = max_loc
+                x = local_x + x_offset
+                y = local_y + y_offset
                 best = (float(max_val), name, x, y, new_w, new_h, scaled_mask)
 
     if best is None:
