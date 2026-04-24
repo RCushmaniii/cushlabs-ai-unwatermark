@@ -298,12 +298,20 @@ def clean_image(
         x2 = min(current.width, r.x + r.width + pad_x)
         y2 = min(current.height, r.y + r.height + pad_y)
 
-        region_crop = current.crop((x1, y1, x2, y2))
-        blurred = region_crop.filter(ImageFilter.GaussianBlur(radius=2))
-        current.paste(blurred, (x1, y1))
-        logger.info(
-            f"Applied blur polish to region ({x1},{y1})-({x2},{y2})"
-        )
+        # Guard against regions that landed fully outside the image bounds —
+        # produces an inverted crop box (x2<x1 or y2<y1) which PIL rejects.
+        if x2 > x1 and y2 > y1:
+            region_crop = current.crop((x1, y1, x2, y2))
+            blurred = region_crop.filter(ImageFilter.GaussianBlur(radius=2))
+            current.paste(blurred, (x1, y1))
+            logger.info(
+                f"Applied blur polish to region ({x1},{y1})-({x2},{y2})"
+            )
+        else:
+            logger.warning(
+                f"Skipping blur polish: region ({r.x},{r.y},{r.width}x{r.height}) "
+                f"outside image bounds ({current.width}x{current.height})"
+            )
 
     _emit(on_progress, "Watermark removal complete", 95)
 

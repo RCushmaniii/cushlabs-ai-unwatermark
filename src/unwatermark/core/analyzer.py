@@ -180,7 +180,7 @@ def analyze_watermark(
         elif config.analysis_provider == AnalysisProvider.OPENAI:
             return _analyze_with_openai(enhanced, prompt, config)
     except Exception as e:
-        logger.error(f"AI analysis failed: {e}. Falling back to heuristic.")
+        logger.warning(f"AI analysis failed: {e}. Falling back to heuristic.")
         return _heuristic_fallback(image, annotation)
 
 
@@ -211,13 +211,26 @@ def _image_to_base64(image: Image.Image) -> str:
 def _parse_analysis_json(raw: str, image: Image.Image) -> WatermarkAnalysis:
     """Parse the LLM's JSON response into a WatermarkAnalysis."""
     # Strip markdown code fences if present
-    text = raw.strip()
+    text = raw.strip() if raw else ""
     if text.startswith("```"):
         lines = text.split("\n")
         text = "\n".join(lines[1:-1]) if lines[-1].strip() == "```" else "\n".join(lines[1:])
         text = text.strip()
 
-    data = json.loads(text)
+    if not text:
+        logger.warning(f"Vision model returned empty response (raw={raw!r}). Treating as no detection.")
+        return WatermarkAnalysis(
+            watermark_found=False,
+            region=WatermarkRegion(0, 0, 0, 0),
+            description="Empty vision model response",
+            confidence=0.0,
+        )
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        logger.warning(f"Vision model returned non-JSON response: {text[:500]!r}")
+        raise
 
     if not data.get("watermark_found", False):
         return WatermarkAnalysis(

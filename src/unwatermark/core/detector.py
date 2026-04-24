@@ -1,6 +1,8 @@
 """Watermark detection — layered approach for reliable results.
 
-v2 Detection pipeline:
+v3 Detection pipeline:
+0. Template matching for known watermarks (NotebookLM) — deterministic, free,
+   produces a pixel-perfect mask from the template's own glyph pixels.
 1. OCR detection (deterministic, fast, local — optional on lightweight deploys)
 2. Florence-2 via Replicate (~$0.001/call) — catches text + visual watermarks
    → SAM refinement (~$0.003) — pixel-perfect mask for precise inpainting
@@ -19,6 +21,7 @@ from unwatermark.config import AnalysisProvider, Config
 from unwatermark.core.analyzer import _heuristic_fallback, analyze_watermark
 from unwatermark.core.florence_detector import detect_watermark_florence
 from unwatermark.core.sam_detector import detect_watermark_sam, refine_with_sam
+from unwatermark.core.template_detector import detect_watermark_template
 from unwatermark.models.analysis import WatermarkAnalysis
 from unwatermark.models.annotation import UserAnnotation
 
@@ -63,6 +66,23 @@ def detect_watermark(
         WatermarkAnalysis with detection results and recommended strategy.
     """
     global _florence_disabled, _sam_disabled
+
+    # Layer 0: Template matching for known watermarks (NotebookLM).
+    # For the primary use case — removing Google NotebookLM's branding from
+    # generated slides — the watermark is the same logo, same size, in the
+    # same position on every image. Template matching is deterministic, free,
+    # and yields a pixel-perfect mask from the template's own glyph pixels.
+    # Only falls through to the AI stack when no known template matches.
+    try:
+        template_result = detect_watermark_template(image)
+        if template_result is not None:
+            logger.info(
+                f"Template detection succeeded: {template_result.description} "
+                f"confidence={template_result.confidence:.3f}"
+            )
+            return template_result
+    except Exception as e:
+        logger.warning(f"Template detection failed: {e} — continuing to OCR/AI")
 
     # Layer 1: OCR detection (deterministic, same result every time)
     # Skipped on lightweight deployments where EasyOCR/PyTorch aren't installed
