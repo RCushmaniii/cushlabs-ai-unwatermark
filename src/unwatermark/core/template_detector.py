@@ -39,10 +39,12 @@ _TEMPLATES_DIR = Path(__file__).parent.parent / "assets"
 # search-zone restriction, not by a tight threshold.
 _MATCH_THRESHOLD = 0.65
 
-# Template scale factors to search. NotebookLM watermarks render at nearly
-# constant pixel size across typical slide resolutions, but we sweep a range
-# to handle downscaled PDFs and higher-res exports.
-_SCALES = (0.6, 0.75, 0.9, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0)
+# Template scale factors to search. PPTX renders the watermark at a slightly
+# different pixel size than the reference screenshot (e.g., a 1665px source
+# template matched at scale 0.826 on a 1376px-rendered slide). A 0.05-step
+# sweep from 0.5 to 2.0 ensures we hit the real scale without gaps — the
+# previous (0.15-step) sweep straddled the sweet spot and missed matches.
+_SCALES = tuple(round(0.5 + 0.05 * i, 2) for i in range(31))  # 0.50 ... 2.00
 
 # NotebookLM watermarks are always rendered in the bottom-right corner of the
 # generated slide — never the middle, never the left side. Constraining the
