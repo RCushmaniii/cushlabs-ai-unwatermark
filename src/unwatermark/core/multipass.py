@@ -233,6 +233,20 @@ def clean_image(
         # Free memory between passes — LaMa and OCR are memory-hungry
         gc.collect()
 
+        # Stop after a confirmed template match. Template detection targets
+        # known fixed watermarks (currently NotebookLM) which always appear
+        # exactly once per slide — additional passes only produce false
+        # positives on body text (OCR) or content regions (Vision AI) that
+        # get inpainted and damage the slide. Generic watermarks detected
+        # via OCR/Vision still benefit from multi-pass re-scanning, so this
+        # short-circuit is scoped to template matches only.
+        if pass_num == 1 and "template match" in (analysis.description or "").lower():
+            logger.info(
+                f"Pass {pass_num}: template-match removal is complete; "
+                f"skipping re-scans to avoid false-positive damage"
+            )
+            break
+
     # Targeted NotebookLM check: if the main loop found a different (larger)
     # watermark and never specifically found NotebookLM, do one targeted pass.
     # Skip if NotebookLM was already found and removed in the main loop.
@@ -288,7 +302,16 @@ def clean_image(
 
     # Final polish: apply a light Gaussian blur to the watermark region to
     # smudge out any faint remnants that inpainting didn't fully eliminate.
-    if removed > 0 and first_analysis is not None:
+    # Skip when the detection came from a pixel-perfect mask (template match
+    # or SAM refinement) — LaMa already inpainted only the exact glyph pixels,
+    # so blurring a padded rectangle around the region only introduces a
+    # visible soft-rectangle artifact that's worse than the residue it tries
+    # to hide.
+    if (
+        removed > 0
+        and first_analysis is not None
+        and first_analysis.mask is None
+    ):
         r = first_analysis.region
         # Expand the blur region slightly (10% padding) to catch edge artifacts
         pad_x = int(r.width * 0.10)
