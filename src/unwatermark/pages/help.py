@@ -242,8 +242,8 @@ HELP_PAGE = page("Help Center", """
     <div class="prose">
       <ul>
         <li><strong>Images</strong> -- PNG, JPG, BMP, TIFF, WebP. Single image files up to 50 MB. Results include a before/after comparison slider.</li>
-        <li><strong>PDF</strong> -- Multi-page documents. Each page is rendered to a high-resolution image, cleaned, and reassembled into a new PDF. Note: vector content is rasterized in this process.</li>
-        <li><strong>PPTX</strong> -- PowerPoint presentations (up to 20 slides). Embedded slide images are processed in-place, preserving all slide layout and formatting.</li>
+        <li><strong>PDF</strong> -- Multi-page documents (up to 15 pages). Each page is rendered to a high-resolution image, cleaned, and reassembled into a new PDF. Note: vector content is rasterized in this process.</li>
+        <li><strong>PPTX</strong> -- PowerPoint presentations (up to 15 slides). Embedded slide images are processed in-place, preserving all slide layout and formatting.</li>
       </ul>
     </div>
   </div>

@@ -17,6 +17,7 @@ from pptx import Presentation
 
 from unwatermark.config import Config
 from unwatermark.core.multipass import clean_image
+from unwatermark.errors import UserInputError
 from unwatermark.models.analysis import WatermarkAnalysis
 from unwatermark.models.annotation import UserAnnotation
 
@@ -49,13 +50,13 @@ def process_pptx(
     Returns:
         Path to the output file.
     """
-    MAX_SLIDES = 20
+    MAX_SLIDES = 15
 
     prs = Presentation(str(input_path))
 
     slide_count = len(prs.slides)
     if slide_count > MAX_SLIDES:
-        raise ValueError(
+        raise UserInputError(
             f"PPTX has {slide_count} slides (max {MAX_SLIDES}). "
             f"Split the file or use the CLI for larger presentations."
         )

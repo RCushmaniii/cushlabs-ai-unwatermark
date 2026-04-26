@@ -13,6 +13,7 @@ from PIL import Image
 
 from unwatermark.config import Config
 from unwatermark.core.multipass import clean_image
+from unwatermark.errors import UserInputError
 from unwatermark.models.analysis import WatermarkAnalysis
 from unwatermark.models.annotation import UserAnnotation
 
@@ -45,7 +46,7 @@ def process_pdf(
     Returns:
         Path to the output file.
     """
-    MAX_PAGES = 20
+    MAX_PAGES = 15
 
     src_doc = fitz.open(str(input_path))
     out_doc = fitz.open()
@@ -53,7 +54,7 @@ def process_pdf(
     page_count = len(src_doc)
     if page_count > MAX_PAGES:
         src_doc.close()
-        raise ValueError(
+        raise UserInputError(
             f"PDF has {page_count} pages (max {MAX_PAGES}). "
             f"Split the file or use the CLI for larger documents."
         )
