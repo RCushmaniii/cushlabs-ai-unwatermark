@@ -27,6 +27,7 @@ from unwatermark.cli import _get_handler
 from unwatermark.config import load_config, validate_env
 from unwatermark.core.detector import detect_watermark
 from unwatermark.core.multipass import constrain_image_size
+from unwatermark.errors import UserInputError
 from unwatermark.models.analysis import WatermarkRegion
 from unwatermark.models.annotation import UserAnnotation
 from unwatermark.pages import (
@@ -453,6 +454,10 @@ async def process_file(
                 **({"preview_dir": preview_dir} if preview_dir else {}),
             )
             logger.info(f"Handler completed. Output exists: {output_path.exists()}")
+        except UserInputError as e:
+            # Input rejected by a guard (page count, etc.) — not a bug, don't page Sentry.
+            logger.warning("Rejected upload: %s", e)
+            error_holder.append(str(e))
         except Exception as e:
             logger.exception("Processing failed")
             error_holder.append(_friendly_error(e))
