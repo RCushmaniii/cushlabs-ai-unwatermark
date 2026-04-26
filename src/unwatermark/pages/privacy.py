@@ -22,7 +22,7 @@ PRIVACY_PAGE = page("Privacy Policy", """
   <div class="card">
     <h2 class="section-title">Information We Process</h2>
     <div class="prose">
-      <p><strong>Files you upload:</strong> When you upload an image, PDF, or PPTX file, it is written to temporary storage on the processing server while the watermark removal runs. Image content may be sent to third-party AI services (see below) for detection and inpainting. Your original upload is deleted as soon as processing finishes; the cleaned output is held briefly so you can download it (see Data Retention).</p>
+      <p><strong>Files you upload:</strong> When you submit a file, it is held in temporary storage only for the time needed to process it. Image content may be transmitted to third-party processing providers as part of the removal workflow. Your original upload is discarded as soon as processing finishes, and the cleaned output is available only for a short download window (see Data Retention).</p>
       <p><strong>We do not:</strong></p>
       <ul>
         <li>Permanently store your uploaded files</li>
@@ -38,11 +38,7 @@ PRIVACY_PAGE = page("Privacy Policy", """
   <div class="card">
     <h2 class="section-title">Third-Party Services</h2>
     <div class="prose">
-      <p>To analyze watermarks, uploaded images are sent to:</p>
-      <ul>
-        <li><strong>Anthropic (Claude API)</strong> — for vision-based watermark detection. Anthropic's data handling is governed by their <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">privacy policy</a>. Per their commercial API terms, data sent via the API is not used for model training.</li>
-      </ul>
-      <p>If you use the CLI tool with the <code>--no-ai</code> flag, no data is sent to any external service.</p>
+      <p>To carry out watermark removal, image content may be transmitted to third-party processing providers under their respective privacy policies and commercial terms. We use providers whose terms prohibit using submitted data to train their models. We send only the content needed to perform the requested processing &mdash; no account information, contact details, or other personal data.</p>
     </div>
   </div>
 </div>
@@ -60,7 +56,7 @@ PRIVACY_PAGE = page("Privacy Policy", """
   <div class="card">
     <h2 class="section-title">Data Retention</h2>
     <div class="prose">
-      <p>Original uploads are deleted from temporary storage as soon as processing finishes (success or failure). The cleaned output file is kept long enough for you to download it &mdash; at most one hour &mdash; after which a background cleanup task removes it automatically. We do not retain any files, metadata, or processing results beyond that window, and nothing is written to a database.</p>
+      <p>Original uploads are discarded as soon as processing finishes (success or failure). Cleaned output files are retained only long enough for you to download them &mdash; up to one hour &mdash; after which they are automatically removed. We do not retain user files, processing results, or account data beyond this window.</p>
     </div>
   </div>
 </div>
@@ -69,7 +65,7 @@ PRIVACY_PAGE = page("Privacy Policy", """
   <div class="card">
     <h2 class="section-title">Security</h2>
     <div class="prose">
-      <p>All communication with the Service uses HTTPS encryption in transit. Files are processed in isolated temporary storage and automatically cleaned up. We do not maintain a database of user data because we do not collect user data.</p>
+      <p>All communication with the Service uses HTTPS encryption in transit. Files are handled in isolated temporary storage and automatically removed within the retention window described above. Because we do not collect user accounts or personal data, there is no user data to safeguard beyond the brief processing window.</p>
     </div>
   </div>
 </div>
