@@ -155,6 +155,70 @@ _processing_semaphore = asyncio.Semaphore(1)
 # Max upload size: 100MB (prevents accidental huge uploads from eating RAM)
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
+# Output retention — cleaned files are deleted by the background sweeper after this.
+# Long enough for the user to download, short enough that abandoned jobs don't pile up.
+DOWNLOAD_TTL_SECONDS = int(os.getenv("DOWNLOAD_TTL_SECONDS", "3600"))  # 1 hour
+SWEEP_INTERVAL_SECONDS = int(os.getenv("SWEEP_INTERVAL_SECONDS", "600"))  # 10 minutes
+
+
+# ---------------------------------------------------------------------------
+# Output cleanup sweeper
+# ---------------------------------------------------------------------------
+
+def _sweep_expired_outputs(ttl_seconds: int = DOWNLOAD_TTL_SECONDS) -> int:
+    """Delete download tokens, output files, and preview dirs older than TTL.
+
+    Iterates token JSON files (the source of truth) and follows pointers to
+    the cleaned output file and preview directory. Returns the number of
+    tokens swept.
+    """
+    import shutil
+    import time
+
+    cutoff = time.time() - ttl_seconds
+    swept = 0
+    for meta_file in _DOWNLOAD_DIR.glob("*.json"):
+        try:
+            if meta_file.stat().st_mtime > cutoff:
+                continue
+            try:
+                meta = json.loads(meta_file.read_text())
+            except (json.JSONDecodeError, OSError):
+                meta = {}
+            output_path = meta.get("path")
+            if output_path:
+                Path(output_path).unlink(missing_ok=True)
+            preview_dir = meta.get("preview_dir")
+            if preview_dir:
+                shutil.rmtree(preview_dir, ignore_errors=True)
+            meta_file.unlink(missing_ok=True)
+            swept += 1
+        except Exception:
+            logger.exception("Sweeper failed on %s", meta_file)
+    if swept:
+        logger.info("Sweeper deleted %d expired download(s)", swept)
+    return swept
+
+
+async def _sweep_loop() -> None:
+    """Background task: run the sweeper on an interval until shutdown."""
+    while True:
+        try:
+            await asyncio.to_thread(_sweep_expired_outputs)
+        except Exception:
+            logger.exception("Sweep loop iteration failed")
+        await asyncio.sleep(SWEEP_INTERVAL_SECONDS)
+
+
+@app.on_event("startup")
+async def _start_sweeper() -> None:
+    asyncio.create_task(_sweep_loop())
+    logger.info(
+        "Output sweeper started (TTL=%ds, interval=%ds)",
+        DOWNLOAD_TTL_SECONDS,
+        SWEEP_INTERVAL_SECONDS,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Pages
