@@ -22,7 +22,7 @@ PRIVACY_PAGE = page("Privacy Policy", """
   <div class="card">
     <h2 class="section-title">Information We Process</h2>
     <div class="prose">
-      <p><strong>Files you upload:</strong> When you upload an image, PDF, or PPTX file, it is processed in server memory. The image content may be sent to Anthropic's Claude API for watermark detection analysis. Temporary files created during processing are automatically deleted when your request completes.</p>
+      <p><strong>Files you upload:</strong> When you upload an image, PDF, or PPTX file, it is written to temporary storage on the processing server while the watermark removal runs. Image content may be sent to third-party AI services (see below) for detection and inpainting. Your original upload is deleted as soon as processing finishes; the cleaned output is held briefly so you can download it (see Data Retention).</p>
       <p><strong>We do not:</strong></p>
       <ul>
         <li>Permanently store your uploaded files</li>
@@ -60,7 +60,7 @@ PRIVACY_PAGE = page("Privacy Policy", """
   <div class="card">
     <h2 class="section-title">Data Retention</h2>
     <div class="prose">
-      <p>Uploaded files are held in server memory only for the duration of processing (typically a few seconds). No files, metadata, or processing results are retained after the HTTP response is sent.</p>
+      <p>Original uploads are deleted from temporary storage as soon as processing finishes (success or failure). The cleaned output file is kept long enough for you to download it &mdash; at most one hour &mdash; after which a background cleanup task removes it automatically. We do not retain any files, metadata, or processing results beyond that window, and nothing is written to a database.</p>
     </div>
   </div>
 </div>
