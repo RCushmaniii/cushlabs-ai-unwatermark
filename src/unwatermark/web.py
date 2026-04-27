@@ -76,13 +76,19 @@ validate_env()
 # ---------------------------------------------------------------------------
 
 _sentry_dsn = os.getenv("SENTRY_DSN", "")
-if _sentry_dsn:
+_sentry_env = os.getenv("ENVIRONMENT", "production")
+# Only report to Sentry in production. Local dev runs share .env (and its DSN)
+# with prod, so without this gate every local crash flushes events to the
+# production project's alert stream.
+if _sentry_dsn and _sentry_env == "production":
     sentry_sdk.init(
         dsn=_sentry_dsn,
         traces_sample_rate=0.1,
-        environment=os.getenv("ENVIRONMENT", "production"),
+        environment=_sentry_env,
     )
     logger.info("Sentry initialized")
+elif _sentry_dsn:
+    logger.info("Sentry skipped (ENVIRONMENT=%s, not production)", _sentry_env)
 else:
     logger.warning("SENTRY_DSN not set — error reporting disabled")
 
