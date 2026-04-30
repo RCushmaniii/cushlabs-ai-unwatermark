@@ -170,3 +170,23 @@ Add to HTML pages:
 ```html
 <script src="https://vitals.cushlabs.ai/tracker.js" data-site="unwatermark" defer></script>
 ```
+
+### Rate limiting
+
+Per-IP rate limiting is enforced at the **Caddy edge**, not by the slowapi decorators in `web.py`. The slowapi decorators stay in place as defense-in-depth (they bucket all traffic under the Docker bridge IP, so they almost never fire correctly — Caddy is the actual abuse defense).
+
+Current edge limits on `unwatermark.cushlabs.ai`:
+- `POST /process` — 10/minute per real client IP
+- `POST /analyze` — 20/minute per real client IP
+
+Architecture, install, Caddyfile syntax, and ops are documented in the prod-server repo: see [`docs/caddy-rate-limiting.md`](https://github.com/RCushmaniii/cushlabs-prod-server/blob/main/docs/caddy-rate-limiting.md). To change the limits, edit the `Caddyfile` in `cushlabs-prod-server`, PR it, then run `bash scripts/sync-caddy.sh` on the VPS.
+
+### Post-deploy health check
+
+`scripts/post-deploy-healthcheck.sh` hits every public vhost on the VPS, asserts 2xx, then runs a synthetic 11x POST to `/process` to confirm the 11th gets a 429. Run after any deploy or Caddy change:
+
+```bash
+bash scripts/post-deploy-healthcheck.sh
+```
+
+Expected output ends with `ALL CHECKS PASSED`.
