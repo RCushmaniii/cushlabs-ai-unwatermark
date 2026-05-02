@@ -27,6 +27,7 @@ from unwatermark.cli import _get_handler
 from unwatermark.config import load_config, validate_env
 from unwatermark.core.detector import detect_watermark
 from unwatermark.core.multipass import constrain_image_size
+from unwatermark.core.replicate_helpers import ReplicateRateLimitExhausted
 from unwatermark.errors import UserInputError
 from unwatermark.models.analysis import WatermarkRegion
 from unwatermark.models.annotation import UserAnnotation
@@ -77,6 +78,26 @@ validate_env()
 
 _sentry_dsn = os.getenv("SENTRY_DSN", "")
 _sentry_env = os.getenv("ENVIRONMENT", "production")
+
+
+def _sentry_before_send(event, hint):
+    """Drop operational rate-limit events so they don't page on-call.
+
+    Replicate throttling is a known-recoverable condition the user sees as a
+    friendly 429; it isn't a bug. We still log it locally via stderr so it's
+    visible in `docker logs`, just not in Sentry's alert stream.
+    """
+    exc_info = hint.get("exc_info") if hint else None
+    if exc_info:
+        exc = exc_info[1]
+        if isinstance(exc, ReplicateRateLimitExhausted):
+            return None
+        msg = str(exc).lower()
+        if "throttled" in msg and ("429" in msg or "rate limit" in msg):
+            return None
+    return event
+
+
 # Only report to Sentry in production. Local dev runs share .env (and its DSN)
 # with prod, so without this gate every local crash flushes events to the
 # production project's alert stream.
@@ -85,6 +106,7 @@ if _sentry_dsn and _sentry_env == "production":
         dsn=_sentry_dsn,
         traces_sample_rate=0.1,
         environment=_sentry_env,
+        before_send=_sentry_before_send,
     )
     logger.info("Sentry initialized")
 elif _sentry_dsn:
@@ -419,6 +441,12 @@ async def analyze_file(
 
     try:
         analysis = detect_watermark(image, config, annotation)
+    except ReplicateRateLimitExhausted as e:
+        logger.warning("Analysis throttled by Replicate: %s", e)
+        return JSONResponse(
+            {"error": _friendly_error(e)}, status_code=429,
+            headers={"Retry-After": "60"},
+        )
     except Exception as e:
         logger.exception("Analysis failed")
         return JSONResponse(
@@ -528,6 +556,11 @@ async def process_file(
             # Input rejected by a guard (page count, etc.) — not a bug, don't page Sentry.
             logger.warning("Rejected upload: %s", e)
             error_holder.append(str(e))
+        except ReplicateRateLimitExhausted as e:
+            # Replicate throttle exhausted — operational, not a bug.
+            # Sentry's before_send filter drops this; log as warning, not error.
+            logger.warning("Replicate rate limit exhausted: %s", e)
+            error_holder.append(_friendly_error(e))
         except Exception as e:
             logger.exception("Processing failed")
             error_holder.append(_friendly_error(e))
@@ -710,6 +743,11 @@ def _extract_preview(content: bytes, suffix: str) -> Image.Image | None:
 
 def _friendly_error(exc: Exception) -> str:
     """Convert exceptions into user-friendly error messages."""
+    if isinstance(exc, ReplicateRateLimitExhausted):
+        return (
+            "Our image-processing service is busy right now. "
+            "Please wait about a minute and try again."
+        )
     msg = str(exc).lower()
     if "api_key" in msg or "authentication" in msg or "401" in msg:
         return "API key is missing or invalid. Check your .env file."
@@ -717,8 +755,11 @@ def _friendly_error(exc: Exception) -> str:
         return (
             "The AI service took too long to respond. Please try again."
         )
-    if "rate" in msg and "limit" in msg:
-        return "API rate limit reached. Wait a moment and try again."
+    if "throttled" in msg or ("rate" in msg and "limit" in msg):
+        return (
+            "Our image-processing service is busy right now. "
+            "Please wait about a minute and try again."
+        )
     if "connection" in msg:
         return (
             "Could not connect to the AI service. Check your internet "

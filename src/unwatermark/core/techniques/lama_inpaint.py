@@ -210,11 +210,13 @@ class LamaInpaintTechnique(RemovalTechnique):
     def _run_replicate(self, image: Image.Image, mask: Image.Image) -> Image.Image:
         """Run LaMa on Replicate's hosted infrastructure.
 
-        Retries up to 3 times on rate limit (429) errors with exponential backoff.
-        This is the most critical Replicate call — worth waiting for.
+        LaMa is the final inpainting step — there is no fallback if it fails,
+        so we use the maximum retry budget (5) to weather Replicate's 60s
+        sliding rate-limit window. After that, ReplicateRateLimitExhausted
+        propagates and the web layer turns it into a friendly 429.
         """
-        import time
         from unwatermark.config import get_replicate_client
+        from unwatermark.core.replicate_helpers import run_with_retry
 
         api_token = self._backend_kwargs.get("api_token")
         client = get_replicate_client(api_token)
@@ -223,27 +225,14 @@ class LamaInpaintTechnique(RemovalTechnique):
         img_bytes = self._image_to_bytes(image, "JPEG")
         mask_bytes = self._image_to_bytes(mask, "PNG")
 
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                output = client.run(
-                    "allenhooo/lama:cdac78a1bec5b23c07fd29692fb70baa513ea403a39e643c48ec5edadb15fe72",
-                    input={
-                        "image": io.BytesIO(img_bytes),
-                        "mask": io.BytesIO(mask_bytes),
-                    },
-                )
-                break  # success
-            except Exception as e:
-                if "429" in str(e) and attempt < max_retries - 1:
-                    wait = 10 * (attempt + 1)  # 10s, 20s
-                    logger.warning(
-                        f"LaMa rate limited (attempt {attempt + 1}/{max_retries}), "
-                        f"retrying in {wait}s..."
-                    )
-                    time.sleep(wait)
-                else:
-                    raise
+        output = run_with_retry(
+            client,
+            "allenhooo/lama:cdac78a1bec5b23c07fd29692fb70baa513ea403a39e643c48ec5edadb15fe72",
+            input={
+                "image": io.BytesIO(img_bytes),
+                "mask": io.BytesIO(mask_bytes),
+            },
+        )
 
         # Replicate returns a URL or file-like output
         if isinstance(output, str):
