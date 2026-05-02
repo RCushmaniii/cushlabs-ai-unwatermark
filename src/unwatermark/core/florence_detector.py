@@ -97,15 +97,19 @@ def _try_grounding(
     api_errors: list | None = None,
 ) -> WatermarkAnalysis | None:
     """Try Caption to Phrase Grounding to find watermark regions."""
+    from unwatermark.core.replicate_helpers import run_with_retry
+
     try:
         # First, get a detailed caption
         logger.info("Florence-2: getting image caption...")
-        caption_output = client.run(
+        caption_output = run_with_retry(
+            client,
             "lucataco/florence-2-large:da53547e17d45b9cfb48174b2f18af8b83ca020fa76db62136bf9c6616762595",
             input={
                 "image": img_uri,
                 "task_input": "More Detailed Caption",
             },
+            max_retries=1,
         )
         caption = _extract_text(caption_output)
         if not caption:
@@ -127,13 +131,15 @@ def _try_grounding(
         # Ground the watermark mention in the image
         ground_text = custom_prompt or "watermark"
         logger.info(f"Florence-2: grounding '{ground_text}'...")
-        ground_output = client.run(
+        ground_output = run_with_retry(
+            client,
             "lucataco/florence-2-large:da53547e17d45b9cfb48174b2f18af8b83ca020fa76db62136bf9c6616762595",
             input={
                 "image": img_uri,
                 "task_input": "Caption to Phrase Grounding",
                 "text_input": ground_text if custom_prompt else caption,
             },
+            max_retries=1,
         )
 
         return _parse_grounding_output(ground_output, img_w, img_h, max_bbox_percent, "watermark")
@@ -151,14 +157,18 @@ def _try_ocr_with_region(
     api_errors: list | None = None,
 ) -> WatermarkAnalysis | None:
     """Try OCR with Region to find text watermarks Florence might catch that EasyOCR missed."""
+    from unwatermark.core.replicate_helpers import run_with_retry
+
     try:
         logger.info("Florence-2: running OCR with region...")
-        ocr_output = client.run(
+        ocr_output = run_with_retry(
+            client,
             "lucataco/florence-2-large:da53547e17d45b9cfb48174b2f18af8b83ca020fa76db62136bf9c6616762595",
             input={
                 "image": img_uri,
                 "task_input": "OCR with Region",
             },
+            max_retries=1,
         )
 
         return _parse_ocr_output(ocr_output, img_w, img_h, max_bbox_percent, custom_prompt)

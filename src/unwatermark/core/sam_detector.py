@@ -76,14 +76,18 @@ def detect_watermark_sam(
     image.convert("RGB").save(img_bytes, format="JPEG", quality=85)
     img_bytes.seek(0)
 
+    from unwatermark.core.replicate_helpers import run_with_retry
+
     try:
         logger.info(f"Lang-SAM: detecting '{mask_prompt}'...")
-        output = client.run(
+        output = run_with_retry(
+            client,
             _LANG_SAM_MODEL,
             input={
                 "image": img_bytes,
                 "text_prompt": mask_prompt,
             },
+            max_retries=1,
         )
 
         # Lang-SAM returns a single mask image (FileOutput or URL string)
@@ -204,14 +208,18 @@ def refine_with_sam(
     crop.convert("RGB").save(img_bytes, format="JPEG", quality=85)
     img_bytes.seek(0)
 
+    from unwatermark.core.replicate_helpers import run_with_retry
+
     try:
         logger.info(f"SAM refinement: generating pixel mask for '{mask_prompt}'...")
-        output = client.run(
+        output = run_with_retry(
+            client,
             _LANG_SAM_MODEL,
             input={
                 "image": img_bytes,
                 "text_prompt": mask_prompt,
             },
+            max_retries=1,
         )
 
         crop_mask = _fetch_mask_output(output)
