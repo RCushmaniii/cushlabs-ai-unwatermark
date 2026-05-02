@@ -56,7 +56,18 @@ def remove_watermark(
         inpaint_available=inpaint_ok,
     )
 
+    # Clamp the region to image bounds before any cropping. Detectors and
+    # user-drawn boxes occasionally land partially outside the image; PIL
+    # rejects inverted crop boxes with "Coordinate 'lower' is less than
+    # 'upper'". Mutates the analysis so the technique sees the same bounds.
+    analysis.region = analysis.region.clamped(image.width, image.height)
     r = analysis.region
+    if r.width == 0 or r.height == 0:
+        logger.warning(
+            f"Skipping removal: region collapsed to zero after bounds clamp "
+            f"(image={image.width}x{image.height}, desc='{analysis.description}')"
+        )
+        return None
 
     # Safety guard: reject detections that cover too much of the image.
     # Large diagonal overlays (SAMPLE PREVIEW, DRAFT across full slide) can't

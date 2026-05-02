@@ -189,7 +189,10 @@ def refine_with_sam(
     # Crop to the detection region with a capped margin — large enough for SAM
     # to see context around the watermark, but small enough to avoid pulling in
     # distant content text (which SAM would segment as "watermark text").
-    r = analysis.region
+    r = analysis.region.clamped(image.width, image.height)
+    if r.width == 0 or r.height == 0:
+        logger.info("SAM refinement: region outside image bounds — skipping")
+        return None
     # 50% of region size, but never more than 3% of image dimension
     max_margin = int(max(image.width, image.height) * 0.03)
     margin = min(max(r.width, r.height) // 2, max_margin)
