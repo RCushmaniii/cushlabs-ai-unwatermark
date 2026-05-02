@@ -73,6 +73,23 @@ class WatermarkRegion:
         y2 = min(img_height, self.y2 + pad_y)
         return WatermarkRegion(x=x, y=y, width=x2 - x, height=y2 - y)
 
+    def clamped(self, img_width: int, img_height: int) -> WatermarkRegion:
+        """Return a copy clamped inside [0, img_width] x [0, img_height].
+
+        Detector-supplied regions (Vision AI, OCR, user-drawn boxes, percent-
+        based fallbacks) can land partially or fully outside the image when
+        the upstream model hallucinates coordinates or the frontend rounds
+        differently than the backend. PIL's `image.crop` rejects boxes where
+        `right < left` or `lower < upper` ("Coordinate 'lower' is less than
+        'upper'"), so every consumer that crops must work from a clamped
+        region. width/height may be 0 if the original was fully out of bounds.
+        """
+        x = max(0, min(img_width, self.x))
+        y = max(0, min(img_height, self.y))
+        x2 = max(x, min(img_width, self.x2))
+        y2 = max(y, min(img_height, self.y2))
+        return WatermarkRegion(x=x, y=y, width=x2 - x, height=y2 - y)
+
 
 @dataclass
 class SurroundingContext:
