@@ -164,7 +164,7 @@ def detect_watermark(
             secondary_config = _Cfg(
                 anthropic_api_key=config.anthropic_api_key,
                 analysis_provider=AnalysisProvider.CLAUDE,
-                analysis_model="claude-sonnet-4-20250514",
+                analysis_model="claude-sonnet-4-6",
                 use_ai=True,
             )
             try:
