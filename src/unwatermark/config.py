@@ -40,7 +40,7 @@ class Config:
 
     # Provider selection
     analysis_provider: AnalysisProvider = AnalysisProvider.CLAUDE
-    analysis_model: str = "claude-sonnet-4-20250514"
+    analysis_model: str = "claude-sonnet-4-6"
     inpaint_backend: InpaintBackend = InpaintBackend.LOCAL
 
     # Processing
@@ -140,7 +140,7 @@ def load_config(**overrides) -> Config:
             os.getenv("UNWATERMARK_ANALYSIS_PROVIDER", "claude")
         ),
         analysis_model=os.getenv(
-            "UNWATERMARK_ANALYSIS_MODEL", "claude-sonnet-4-20250514"
+            "UNWATERMARK_ANALYSIS_MODEL", "claude-sonnet-4-6"
         ),
         inpaint_backend=InpaintBackend(
             os.getenv("UNWATERMARK_INPAINT_BACKEND", "local")
