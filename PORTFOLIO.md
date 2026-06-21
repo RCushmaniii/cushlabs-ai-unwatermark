@@ -27,12 +27,24 @@ tags:
 
 thumbnail: "/images/portfolio/unwatermark-thumb.webp"
 hero_images:
-  - "/images/portfolio/unwatermark-01.webp"
-  - "/images/portfolio/unwatermark-02.webp"
-  - "/images/portfolio/unwatermark-03.webp"
-  - "/images/portfolio/unwatermark-04.webp"
-  - "/images/portfolio/unwatermark-05.webp"
-  - "/images/portfolio/unwatermark-06.webp"
+  - src: "/images/portfolio/unwatermark-01.webp"
+    alt_en: "Unwatermark intro screen presenting the AI tool for removing baked-in watermarks from images, PDFs, and presentations"
+    alt_es: "Pantalla de introducción de Unwatermark que presenta la herramienta de IA para eliminar marcas de agua incrustadas en imágenes, PDF y presentaciones"
+  - src: "/images/portfolio/unwatermark-02.webp"
+    alt_en: "Drag-and-drop web interface where a watermarked file is uploaded for processing"
+    alt_es: "Interfaz web de arrastrar y soltar donde se sube un archivo con marca de agua para procesarlo"
+  - src: "/images/portfolio/unwatermark-03.webp"
+    alt_en: "AI detection pipeline identifying the watermark and generating a pixel-perfect mask over the affected area"
+    alt_es: "Flujo de detección con IA que identifica la marca de agua y genera una máscara de precisión sobre el área afectada"
+  - src: "/images/portfolio/unwatermark-04.webp"
+    alt_en: "Real-time streaming progress as each detect-and-remove pass completes"
+    alt_es: "Progreso en tiempo real conforme se completa cada pasada de detección y eliminación"
+  - src: "/images/portfolio/unwatermark-05.webp"
+    alt_en: "Before-and-after comparison showing the watermark removed by neural inpainting with surrounding content preserved"
+    alt_es: "Comparación de antes y después que muestra la marca de agua eliminada mediante inpainting neuronal con el contenido circundante intacto"
+  - src: "/images/portfolio/unwatermark-06.webp"
+    alt_en: "Clean exported result ready to download, free of watermarks"
+    alt_es: "Resultado exportado limpio y listo para descargar, sin marcas de agua"
 demo_video_url: "/images/portfolio/Unwatermark__The_Limits_of_AI.mp4"
 demo_video_poster: "/images/portfolio/Unwatermark-The-Limits-of-AI-poster.webp"
 
@@ -47,6 +59,14 @@ problem_solved: |
   dozens of slides. Unwatermark automates detection and removal using AI vision models and
   neural inpainting to produce clean, professional files in seconds.
 
+solution: |
+  A layered AI detection pipeline tries the cheapest method first and escalates only when needed:
+  EasyOCR catches text watermarks, Florence-2 and Grounded SAM handle visual detection with
+  pixel-perfect masks, and Claude Vision serves as a fallback for non-standard cases. LaMa neural
+  inpainting then reconstructs the content beneath the watermark instead of cloning or blurring,
+  while up to three detect-remove passes catch any residual marks. Format-specific handlers
+  process images, PDFs, and PPTX files through the same core pipeline.
+
 key_outcomes:
   - "Layered detection pipeline: EasyOCR → Florence-2 → Grounded SAM → Claude Vision → heuristic"
   - "LaMa neural inpainting produces artifact-free results that preserve surrounding content"
@@ -55,6 +75,12 @@ key_outcomes:
   - "Processes 14-slide PPTX exports in under 60 seconds via Replicate API"
   - "Supports images, PDFs, and PPTX with format-specific handlers"
   - "Drag-and-drop web UI with real-time NDJSON streaming progress"
+
+metrics:
+  - "Clean PPTX, PDF, and image exports in under a minute"
+  - "Neural inpainting output visually indistinguishable from unwatermarked originals"
+  - "Orchestrates 4+ ML models with cost-aware fallback routing"
+  - "Zero image-editing skill required — simple drag-and-drop web interface"
 
 tech_stack:
   - "Python 3.10+"
@@ -135,11 +161,13 @@ Images are processed directly. PPTX files have their image blobs replaced in-pla
 ## Results
 
 **For the End User:**
+
 - Clean PPTX, PDF, and image exports from NotebookLM and other watermarked sources in under a minute
 - Professional-quality output — neural inpainting produces results that are visually indistinguishable from unwatermarked originals
 - Simple drag-and-drop web interface with real-time progress — zero image editing knowledge required
 
 **Technical Demonstration:**
+
 - Production AI pipeline orchestrating 4+ ML models (EasyOCR, Florence-2, Grounded SAM, LaMa) with cost-aware fallback routing
 - Practical exploration of AI precision limits — pixel-perfect removal is achievable for corner watermarks but breaks down for large overlays
 - Clean architecture with pluggable detection tiers, technique strategies, and format-specific handlers
