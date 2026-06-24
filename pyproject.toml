@@ -36,7 +36,7 @@ inpaint = [
     "simple-lama-inpainting>=0.5",
 ]
 replicate = [
-    "replicate>=0.25",
+    "replicate>=1.0.7",
 ]
 # Lightweight deploy: web + replicate + openai (no PyTorch, fits in 512MB RAM)
 deploy = [
