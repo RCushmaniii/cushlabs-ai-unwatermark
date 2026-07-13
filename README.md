@@ -159,7 +159,7 @@ Optimized for **corner watermarks** — NotebookLM, copyright text, small logos.
 **Robert Cushman** — CushLabs AI Services
 Guadalajara, Mexico
 
-[info@cushlabs.ai](mailto:info@cushlabs.ai) | [GitHub](https://github.com/RCushmaniii) | [LinkedIn](https://linkedin.com/in/robertcushman) | [cushlabs.ai](https://cushlabs.ai)
+[info@cushlabs.ai](mailto:info@cushlabs.ai) | [GitHub](https://github.com/RCushmaniii) | [LinkedIn](https://linkedin.com/in/robert-cushman3) | [cushlabs.ai](https://cushlabs.ai)
 
 ## License
 
