@@ -5,7 +5,7 @@
 portfolio_enabled: true
 portfolio_priority: 9
 portfolio_featured: false
-portfolio_last_reviewed: "2026-03-31"
+portfolio_last_reviewed: "2026-09-13"
 
 title: "Unwatermark"
 tagline: "Remove baked-in watermarks from images, PDFs, and presentations with a layered AI detection pipeline and neural inpainting"
