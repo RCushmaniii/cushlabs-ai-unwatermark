@@ -1,0 +1,17 @@
+# Keep the image to what the web app needs. pip install -e . needs pyproject.toml
+# and src/; everything else here is dev-only.
+.git
+.github
+docs
+tests
+scripts
+public
+__pycache__
+*.pyc
+.pytest_cache
+.venv
+venv
+.env
+.env.*
+render.yaml
+*.md
