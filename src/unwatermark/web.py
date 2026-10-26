@@ -252,7 +252,9 @@ async def _start_sweeper() -> None:
 # Pages
 # ---------------------------------------------------------------------------
 
-@app.get("/", response_class=HTMLResponse)
+# GET and HEAD: UptimeRobot's free tier probes with HEAD, and a GET-only route
+# answers 405, which the monitor reports as DOWN (same fix as cushlabs-vitals).
+@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def index():
     return LANDING_PAGE
 
