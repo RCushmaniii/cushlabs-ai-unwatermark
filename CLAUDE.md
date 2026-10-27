@@ -142,7 +142,7 @@ watermarks that cover >25% of the image. The UI should set these expectations.
 - **Host:** `178.156.192.117`
 - **SSH:** `ssh deploy@178.156.192.117`
 - **URL:** https://unwatermark.cushlabs.ai
-- **VPS path:** `~/apps/cushlabs-ai-unwatermark/`
+- **VPS path:** none — the box holds no checkout of this repo (removed 2026-10-26); it runs the GHCR image only
 - **Orchestration:** `~/apps/cushlabs-prod-server/docker-compose.yml`
 - **Domain:** `unwatermark.cushlabs.ai` (HTTPS via Caddy/Let's Encrypt)
 - **Internal port:** 8000 (behind Caddy reverse proxy, bound to `127.0.0.1`)
@@ -152,11 +152,13 @@ watermarks that cover >25% of the image. The UI should set these expectations.
 
 ### Deploy
 
+The box never builds. Merging to `main` runs `build-image.yml`, which pushes `ghcr.io/rcushmaniii/cushlabs-ai-unwatermark:latest`; wait for that run to finish, then:
+
 ```bash
-ssh deploy@178.156.192.117 'cd ~/apps/cushlabs-ai-unwatermark && git pull && cd ~/apps/cushlabs-prod-server && docker compose up -d --build unwatermark'
+ssh deploy@178.156.192.117 'cd ~/apps/cushlabs-prod-server && bash scripts/deploy-service.sh unwatermark'
 ```
 
-Code changes require `--build`. Config-only changes (env vars) just need `docker compose restart unwatermark`.
+`deploy-service.sh` records the running image, pulls, recreates, waits up to 90 s for healthy and rolls back on failure. Never pass `--build`. Config-only changes (env vars in `~/apps/cushlabs-prod-server/.env.unwatermark`) just need `docker compose up -d unwatermark` in that directory.
 
 ### Logs
 
@@ -190,3 +192,10 @@ bash scripts/post-deploy-healthcheck.sh
 ```
 
 Expected output ends with `ALL CHECKS PASSED`.
+
+
+## Session Log
+
+A running log of all working sessions is maintained at `docs/SESSION_LOG.md`.
+Always append a new entry at the top of this file before closing a session.
+Use the `session-logger` skill to generate the entry.
